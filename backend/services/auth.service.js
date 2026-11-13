@@ -51,6 +51,20 @@ export const refresh = async (token) => {
   return _buildTokens(user, tenant);
 };
 
+export const confirmPassword = async (userId, password) => {
+  const user = await User.findById(userId).select('+passwordHash');
+  if (!user || !user.isActive) {
+    throw Object.assign(new Error('User not found'), { status: 401 });
+  }
+
+  const match = await user.comparePassword(password);
+  if (!match) {
+    throw Object.assign(new Error('The password is incorrect'), { status: 422 });
+  }
+
+  return true;
+};
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const _buildTokens = (user, tenant) => {

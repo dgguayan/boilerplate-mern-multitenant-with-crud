@@ -38,4 +38,11 @@ export const logout = (_req, res) => {
   return apiResponse.success(res, {}, 'Logged out');
 };
 
+export const confirmPassword = async (req, res, next) => {
+  try {
+    await authService.confirmPassword(req.user.userId, req.body.password);
+    return apiResponse.success(res, {}, 'Password confirmed');
+  } catch (err) { next(err); }
+};
+
 export const me = (req, res) => apiResponse.success(res, { user: req.user });

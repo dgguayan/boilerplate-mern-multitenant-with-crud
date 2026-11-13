@@ -31,6 +31,7 @@ export function AuthProvider({ children }) {
     try { await apiLogout(); } catch { /* ignore */ }
     localStorage.removeItem('accessToken');
     localStorage.removeItem('user');
+    sessionStorage.removeItem('securityPasswordConfirmation');
     setUser(null);
   }, []);
 

@@ -28,10 +28,15 @@ const loginSchema = Joi.object({
   tenantSlug: Joi.string().lowercase().required(),
 });
 
+const confirmPasswordSchema = Joi.object({
+  password: Joi.string().required(),
+});
+
 router.post('/register', loginLimiter, validate(registerSchema), authController.register);
 router.post('/login', loginLimiter, validate(loginSchema), authController.login);
 router.post('/refresh-token', authController.refreshToken);
 router.post('/logout', authController.logout);
+router.post('/confirm-password', authMiddleware, validate(confirmPasswordSchema), authController.confirmPassword);
 router.get('/me', authMiddleware, authController.me);
 
 export default router;

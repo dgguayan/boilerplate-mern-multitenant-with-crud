@@ -5,3 +5,4 @@ export const login = (data) => api.post('/auth/login', data);
 export const logout = () => api.post('/auth/logout');
 export const refreshToken = () => api.post('/auth/refresh-token');
 export const getMe = () => api.get('/auth/me');
+export const confirmPassword = (password) => api.post('/auth/confirm-password', { password });
