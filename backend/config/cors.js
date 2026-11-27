@@ -1,8 +1,12 @@
 const corsOptions = {
   origin: (origin, callback) => {
-    const allowed = process.env.FRONTEND_URL;
+    // FRONTEND_URL may be a comma-separated list of allowed origins
+    const allowed = (process.env.FRONTEND_URL || '')
+      .split(',')
+      .map((o) => o.trim().replace(/\/$/, ''))
+      .filter(Boolean);
     // Allow requests with no origin (mobile apps, Postman, server-to-server)
-    if (!origin || origin === allowed) {
+    if (!origin || allowed.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error(`CORS: origin ${origin} not allowed`));

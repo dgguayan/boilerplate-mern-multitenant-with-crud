@@ -25,7 +25,7 @@ const registerSchema = Joi.object({
 const loginSchema = Joi.object({
   email: Joi.string().email().required(),
   password: Joi.string().required(),
-  tenantSlug: Joi.string().lowercase().required(),
+  tenantSlug: Joi.string().lowercase().allow('').optional(),
 });
 
 const confirmPasswordSchema = Joi.object({

@@ -9,7 +9,7 @@ export const getAll = async (req, res, next) => {
       userId: req.user.userId,
       role: req.user.role,
       page: parseInt(page) || 1,
-      limit: Math.min(parseInt(limit) || 20, 100),
+      limit: Math.min(parseInt(limit) || 20, 1000),
       status,
     });
     return apiResponse.paginated(res, result.data, result.pagination);

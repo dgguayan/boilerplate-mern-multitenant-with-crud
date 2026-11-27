@@ -19,6 +19,8 @@ export const register = async ({ name, email, password, tenantSlug }) => {
 };
 
 export const login = async ({ email, password, tenantSlug }) => {
+  if (!tenantSlug) return _loginWithoutTenant({ email, password });
+
   const tenant = await Tenant.findOne({ slug: tenantSlug, isActive: true });
   if (!tenant) throw Object.assign(new Error('Tenant not found'), { status: 404 });
 
@@ -28,6 +30,41 @@ export const login = async ({ email, password, tenantSlug }) => {
   const match = await user.comparePassword(password);
   if (!match) throw Object.assign(new Error('Invalid credentials'), { status: 401 });
 
+  user.lastLogin = new Date();
+  await user.save();
+
+  return _buildTokens(user, tenant);
+};
+
+// Email is unique per tenant, not globally: find the account(s) whose
+// password matches across active tenants.
+const _loginWithoutTenant = async ({ email, password }) => {
+  const invalid = () => Object.assign(new Error('Invalid credentials'), { status: 401 });
+
+  const users = await User.find({ email, isActive: true }).select('+passwordHash');
+  if (!users.length) throw invalid();
+
+  const activeTenants = await Tenant.find({
+    _id: { $in: users.map((u) => u.tenantId) },
+    isActive: true,
+  });
+  const tenantById = new Map(activeTenants.map((t) => [String(t._id), t]));
+
+  const matches = [];
+  for (const user of users) {
+    const tenant = tenantById.get(String(user.tenantId));
+    if (tenant && (await user.comparePassword(password))) matches.push({ user, tenant });
+  }
+
+  if (!matches.length) throw invalid();
+  if (matches.length > 1) {
+    throw Object.assign(
+      new Error('This account exists in multiple workspaces. Please specify a workspace.'),
+      { status: 409 }
+    );
+  }
+
+  const { user, tenant } = matches[0];
   user.lastLogin = new Date();
   await user.save();
 
