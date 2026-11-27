@@ -13,6 +13,7 @@ export const getAll = async ({ tenantId, userId, role, page = 1, limit = 20, sta
   const [docs, total] = await Promise.all([
     Project.find(filter)
       .populate('createdBy', 'name email')
+      .populate('updatedBy', 'name email')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)

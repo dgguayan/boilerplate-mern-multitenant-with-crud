@@ -465,7 +465,8 @@ const sidebarMenuButtonVariants = cva(
   }
 )
 
-function SidebarMenuButton({
+// forwardRef: these are used as Radix `asChild` triggers, which need the DOM node on React 18
+const SidebarMenuButton = React.forwardRef(function SidebarMenuButton({
   asChild = false,
   isActive = false,
   variant = "default",
@@ -473,12 +474,13 @@ function SidebarMenuButton({
   tooltip,
   className,
   ...props
-}) {
+}, ref) {
   const Comp = asChild ? Slot.Root : "button"
   const { isMobile, state } = useSidebar()
 
   const button = (
     <Comp
+      ref={ref}
       data-slot="sidebar-menu-button"
       data-sidebar="menu-button"
       data-size={size}
@@ -507,18 +509,19 @@ function SidebarMenuButton({
         {...tooltip} />
     </Tooltip>
   );
-}
+})
 
-function SidebarMenuAction({
+const SidebarMenuAction = React.forwardRef(function SidebarMenuAction({
   className,
   asChild = false,
   showOnHover = false,
   ...props
-}) {
+}, ref) {
   const Comp = asChild ? Slot.Root : "button"
 
   return (
     <Comp
+      ref={ref}
       data-slot="sidebar-menu-action"
       data-sidebar="menu-action"
       className={cn(
@@ -529,7 +532,7 @@ function SidebarMenuAction({
       )}
       {...props} />
   );
-}
+})
 
 function SidebarMenuBadge({
   className,

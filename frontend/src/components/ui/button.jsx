@@ -41,23 +41,29 @@ const buttonVariants = cva(
   }
 )
 
-function Button({
-  className,
-  variant = "default",
-  size = "default",
-  asChild = false,
-  ...props
-}) {
+// forwardRef is required on React 18: Radix triggers (`<XTrigger asChild><Button/>`)
+// need the DOM node to anchor dropdowns/popovers, and React 18 does not pass `ref` as a prop.
+const Button = React.forwardRef(function Button(
+  {
+    className,
+    variant = "default",
+    size = "default",
+    asChild = false,
+    ...props
+  },
+  ref
+) {
   const Comp = asChild ? Slot.Root : "button"
 
   return (
     <Comp
+      ref={ref}
       data-slot="button"
       data-variant={variant}
       data-size={size}
       className={cn(buttonVariants({ variant, size, className }))}
       {...props} />
   );
-}
+})
 
 export { Button, buttonVariants }

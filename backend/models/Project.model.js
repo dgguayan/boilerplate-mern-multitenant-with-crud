@@ -9,6 +9,21 @@ const projectSchema = new mongoose.Schema(
       enum: ['active', 'inactive', 'archived'],
       default: 'active',
     },
+    code: { type: String, trim: true, maxlength: 40 },
+    client: { type: String, trim: true, maxlength: 120 },
+    category: {
+      type: String,
+      enum: ['development', 'design', 'marketing', 'infrastructure', 'research'],
+    },
+    priority: {
+      type: String,
+      enum: ['low', 'medium', 'high', 'critical'],
+      default: 'medium',
+    },
+    budget: { type: Number, min: 0, default: 0 },
+    spent: { type: Number, min: 0, default: 0 },
+    startDate: { type: Date },
+    dueDate: { type: Date },
     tenantId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Tenant',
