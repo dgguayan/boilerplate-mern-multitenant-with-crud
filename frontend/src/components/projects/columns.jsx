@@ -1,8 +1,5 @@
 import { createColumnHelper } from '@tanstack/react-table';
 import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
   Copy,
   MoreHorizontal,
   Pencil,
@@ -12,7 +9,6 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import { SortableHeader, selectColumn } from '@/components/data-table/columns.jsx';
 
 const columnHelper = createColumnHelper();
 
@@ -67,25 +64,6 @@ export const formatDate = (value) => (value ? dateFormat.format(new Date(value))
 
 const capitalize = (value) => (value ? value[0].toUpperCase() + value.slice(1) : '—');
 
-function SortableHeader({ column, label, align = 'left' }) {
-  const direction = column.getIsSorted();
-  const SortIcon = direction === 'asc' ? ArrowUp : direction === 'desc' ? ArrowDown : ArrowUpDown;
-
-  return (
-    <Button
-      variant="ghost"
-      className={cn('h-8', align === 'right' ? '-mr-3 ml-auto flex' : '-ml-3')}
-      onClick={column.getToggleSortingHandler()}
-    >
-      {label}
-      <SortIcon className="size-3.5" />
-      {column.getSortIndex() > 0 && (
-        <span className="text-[10px] text-muted-foreground">{column.getSortIndex() + 1}</span>
-      )}
-    </Button>
-  );
-}
-
 function ToneBadge({ value, tones }) {
   return (
     <Badge variant="outline" className={cn('border-transparent capitalize', tones[value])}>
@@ -126,35 +104,9 @@ export function createColumns(actions) {
   });
 
   return columnHelper.columns([
-    columnHelper.display({
-      id: 'select',
-      size: 44,
-      enableCellSelection: false,
-      enableHiding: false,
-      enablePinning: false,
-      enableResizing: false,
-      header: ({ table }) => (
-        <Checkbox
-          checked={
-            table.getIsAllPageRowsSelected()
-              ? true
-              : table.getIsSomePageRowsSelected()
-                ? 'indeterminate'
-                : false
-          }
-          onCheckedChange={(value) => table.toggleAllPageRowsSelected(value === true)}
-          aria-label="Select all projects on this page"
-        />
-      ),
-      cell: ({ row }) =>
-        row.getIsGrouped() ? null : (
-          <Checkbox
-            checked={row.getIsSelected()}
-            disabled={!row.getCanSelect()}
-            onCheckedChange={(value) => row.toggleSelected(value === true)}
-            aria-label={`Select ${row.original.title}`}
-          />
-        ),
+    selectColumn(columnHelper, {
+      allLabel: 'Select all projects on this page',
+      rowLabel: (project) => `Select ${project.title}`,
     }),
     columnHelper.accessor('code', {
       size: 150,

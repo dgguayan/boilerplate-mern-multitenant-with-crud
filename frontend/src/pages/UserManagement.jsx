@@ -1,47 +1,25 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "react-router-dom"
-import { ArrowDown, ArrowUp, ArrowUpDown, Eye, EyeOff, LoaderCircle, MoreHorizontal, Pencil, Power, RefreshCw, SearchX, UserPlus, Users } from "lucide-react"
+import { Eye, EyeOff, LoaderCircle, RefreshCw, UserPlus } from "lucide-react"
 import { toast } from "sonner"
 
 import * as adminApi from "@/api/admin.api"
 import { useAuth } from "@/hooks/useAuth"
 import { cn } from "@/lib/utils"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ActiveBadge, PageHeader, Pagination, ROLE_META, ROLE_ORDER, RelativeTime, RoleBadge, fieldClass, initials, useDebounced } from "@/components/admin/shared"
+import { PageHeader, ROLE_META, ROLE_ORDER, fieldClass } from "@/components/admin/shared"
+import { DataTable } from "@/components/data-table/data-table.jsx"
+import { MonthYearFilter, SelectFilter } from "@/components/data-table/filters.jsx"
+import { columnLabels, createColumns } from "@/components/users/columns.jsx"
 
-const PAGE_SIZE = 20
 const EMPTY_FORM = { name: "", email: "", role: "user", password: "", isActive: true }
 
 function generatePassword() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%"
   const values = crypto.getRandomValues(new Uint32Array(14))
   return Array.from(values, (v) => chars[v % chars.length]).join("")
-}
-
-function SortHeader({ label, field, sort, onSort, className }) {
-  const active = sort.field === field
-  const Icon = !active ? ArrowUpDown : sort.direction === "asc" ? ArrowUp : ArrowDown
-  return (
-    <TableHead className={className} aria-sort={active ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
-      <button type="button" className="inline-flex items-center gap-1 rounded-sm hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none" onClick={() => onSort(field)}>
-        {label}
-        <Icon className={cn("size-3.5", !active && "opacity-40")} aria-hidden="true" />
-      </button>
-    </TableHead>
-  )
 }
 
 function UserDialog({ open, mode, user, assignableRoles, onClose, onSaved }) {
@@ -196,60 +174,84 @@ function UserDialog({ open, mode, user, assignableRoles, onClose, onSaved }) {
   )
 }
 
+// The role and status columns hold display labels ("Super admin", "Active"), so search, grouping
+// and CSV export read the same words the table shows.
+const ROLE_OPTIONS = ROLE_ORDER.map((r) => ({ value: ROLE_META[r].label, label: ROLE_META[r].label }))
+const STATUS_OPTIONS = [
+  { value: "Active", label: "Active" },
+  { value: "Inactive", label: "Inactive" },
+]
+const STATUS_LABELS = { active: "Active", inactive: "Inactive" }
+const GROUP_OPTIONS = [
+  { value: "role", label: "Group by role" },
+  { value: "status", label: "Group by status" },
+]
+
+/** Filters named in the URL, e.g. /members?role=admin from Roles & permissions. Unknown values are ignored. */
+function filtersFromUrl(searchParams) {
+  const role = ROLE_META[searchParams.get("role")]?.label
+  const status = STATUS_LABELS[searchParams.get("status")]
+  return [role && { id: "role", value: role }, status && { id: "status", value: status }].filter(Boolean)
+}
+
+/** Client-side table: load every user in the workspace (the API pages at 100), then filter locally. */
+async function fetchAllUsers(signal) {
+  const users = []
+  for (let page = 1, pages = 1; page <= pages; page++) {
+    const res = await adminApi.getUsers({ sort: "name", direction: "asc", page, limit: 100 }, signal)
+    users.push(...res.data.data.users)
+    pages = res.data.data.pagination.pages
+  }
+  return users
+}
+
 export default function UserManagement() {
   const { user: me } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [search, setSearch] = useState("")
-  const role = searchParams.get("role") || ""
-  const status = searchParams.get("status") || ""
-  const [sort, setSort] = useState({ field: "name", direction: "asc" })
-  const [page, setPage] = useState(1)
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
-  const [loading, setLoading] = useState(true)
   const [version, setVersion] = useState(0)
   const [dialog, setDialog] = useState(null) // { mode, user }
   const [confirm, setConfirm] = useState(null)
-  const debouncedSearch = useDebounced(search)
 
   const myRank = ROLE_META[me?.role]?.rank || 0
   const assignableRoles = ROLE_ORDER.filter((r) => ROLE_META[r].rank <= myRank)
 
-  const setFilter = (key, value) => {
-    setPage(1)
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev)
-      if (value) next.set(key, value)
-      else next.delete(key)
-      return next
-    }, { replace: true })
-  }
-
-  useEffect(() => setPage(1), [debouncedSearch])
+  // A link with ?role= / ?status= opens the table pre-filtered. The parameters are then removed so
+  // the address never disagrees with filters changed in the table; a new link remounts the table.
+  const [entry, setEntry] = useState(() => ({ id: 0, filters: filtersFromUrl(searchParams) }))
+  useEffect(() => {
+    if (!searchParams.has("role") && !searchParams.has("status")) return
+    const filters = filtersFromUrl(searchParams)
+    setEntry((current) => ({ id: current.id + 1, filters }))
+    setSearchParams({}, { replace: true })
+  }, [searchParams, setSearchParams])
+  const initialState = useMemo(
+    () => ({
+      columnPinning: { start: ["select", "name"] },
+      sorting: [{ id: "name", desc: false }],
+      columnFilters: entry.filters,
+    }),
+    [entry]
+  )
 
   useEffect(() => {
     const controller = new AbortController()
-    setLoading(true)
-    adminApi
-      .getUsers({ search: debouncedSearch || undefined, role: role || undefined, status: status || undefined, sort: sort.field, direction: sort.direction, page, limit: PAGE_SIZE }, controller.signal)
-      .then((res) => {
-        setData(res.data.data)
+    fetchAllUsers(controller.signal)
+      .then((users) => {
+        setData(users)
         setError(null)
       })
       .catch((err) => !controller.signal.aborted && setError(adminApi.errorMessage(err, "Couldn't load users.")))
-      .finally(() => !controller.signal.aborted && setLoading(false))
     return () => controller.abort()
-  }, [debouncedSearch, role, status, sort, page, version])
+  }, [version])
 
   const reload = useCallback(() => setVersion((v) => v + 1), [])
-  const onSort = (field) => setSort((s) => ({ field, direction: s.field === field && s.direction === "asc" ? "desc" : "asc" }))
 
   const users = useMemo(
-    () => (data?.users || []).map((u) => ({ ...u, isSelf: String(u._id) === String(me?.id), canManage: (ROLE_META[u.role]?.rank || 0) <= myRank })),
+    () => (data || []).map((u) => ({ ...u, isSelf: String(u._id) === String(me?.id), canManage: (ROLE_META[u.role]?.rank || 0) <= myRank })),
     [data, me, myRank]
   )
-  const counts = data?.counts
-  const hasFilters = Boolean(search || role || status)
 
   const toggleActive = async (u) => {
     try {
@@ -263,12 +265,10 @@ export default function UserManagement() {
     }
   }
 
-  const stats = [
-    { label: "Total users", value: counts?.total },
-    { label: "Active", value: counts?.active },
-    { label: "Inactive", value: counts?.inactive },
-    { label: "Administrators", value: counts && (counts.byRole.admin || 0) + (counts.byRole.superadmin || 0) },
-  ]
+  const columns = useMemo(
+    () => createColumns({ onEdit: (u) => setDialog({ mode: "edit", user: u }), onToggleActive: setConfirm }),
+    []
+  )
 
   return (
     <div className="flex w-full min-w-0 flex-col p-4">
@@ -279,168 +279,44 @@ export default function UserManagement() {
         </Button>
       </PageHeader>
 
-      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {stats.map((s) => (
-          <Card key={s.label} size="sm" className="shadow-none">
-            <CardContent>
-              <p className="text-xs text-muted-foreground">{s.label}</p>
-              <div className="mt-1 text-2xl font-semibold tabular-nums">{s.value ?? <Skeleton className="h-7 w-10" />}</div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {error && (
+        <p role="alert" className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {error}
+        </p>
+      )}
 
-      <div className="rounded-xl border bg-card">
-        <div className="flex flex-wrap items-end gap-2 border-b p-3">
-          <div className="min-w-48 flex-1">
-            <label htmlFor="user-search" className="sr-only">
-              Search users
-            </label>
-            <input id="user-search" type="search" placeholder="Search by name or email" className={fieldClass} value={search} onChange={(e) => setSearch(e.target.value)} />
-          </div>
-          <div>
-            <label htmlFor="user-role-filter" className="sr-only">
-              Role
-            </label>
-            <select id="user-role-filter" className={cn(fieldClass, "w-40")} value={role} onChange={(e) => setFilter("role", e.target.value)}>
-              <option value="">All roles</option>
-              {ROLE_ORDER.map((r) => (
-                <option key={r} value={r}>
-                  {ROLE_META[r].label} {counts ? `(${counts.byRole[r] || 0})` : ""}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="user-status-filter" className="sr-only">
-              Status
-            </label>
-            <select id="user-status-filter" className={cn(fieldClass, "w-36")} value={status} onChange={(e) => setFilter("status", e.target.value)}>
-              <option value="">All statuses</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </div>
-          {hasFilters && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setSearch("")
-                setSearchParams({}, { replace: true })
-              }}
-            >
-              Clear filters
-            </Button>
-          )}
+      {/* Skeleton only on first load so table state survives refreshes after edits */}
+      {!data && !error ? (
+        <div className="flex flex-col gap-2" aria-busy="true">
+          <Skeleton className="h-14 w-full rounded-lg" />
+          {Array.from({ length: 6 }, (_, i) => (
+            <Skeleton key={i} className="h-9 w-full" />
+          ))}
         </div>
-
-        {error && <p role="alert" className="p-4 text-sm text-destructive">{error}</p>}
-
-        <div className="overflow-x-auto" aria-busy={loading}>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <SortHeader label="User" field="name" sort={sort} onSort={onSort} className="pl-4" />
-                <SortHeader label="Role" field="role" sort={sort} onSort={onSort} />
-                <TableHead>Status</TableHead>
-                <SortHeader label="Last sign-in" field="lastLogin" sort={sort} onSort={onSort} />
-                <SortHeader label="Added" field="createdAt" sort={sort} onSort={onSort} />
-                <TableHead className="w-12 pr-4">
-                  <span className="sr-only">Actions</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody className={cn(loading && data && "opacity-60 transition-opacity")}>
-              {!data &&
-                Array.from({ length: 5 }, (_, i) => (
-                  <TableRow key={i}>
-                    <TableCell className="pl-4">
-                      <div className="flex items-center gap-3">
-                        <Skeleton className="size-8 rounded-full" />
-                        <div className="space-y-1.5">
-                          <Skeleton className="h-3.5 w-32" />
-                          <Skeleton className="h-3 w-44" />
-                        </div>
-                      </div>
-                    </TableCell>
-                    {Array.from({ length: 5 }, (_, j) => (
-                      <TableCell key={j}>
-                        <Skeleton className="h-4 w-16" />
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))}
-              {users.map((u) => (
-                <TableRow key={u._id} className={cn(!u.isActive && "text-muted-foreground")}>
-                  <TableCell className="pl-4">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="size-8">
-                        <AvatarFallback className="text-xs">{initials(u.name)}</AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0">
-                        <p className="flex items-center gap-1.5 font-medium text-foreground">
-                          {u.name}
-                          {u.isSelf && <Badge variant="outline">You</Badge>}
-                        </p>
-                        <p className="truncate text-xs text-muted-foreground">{u.email}</p>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <RoleBadge role={u.role} />
-                  </TableCell>
-                  <TableCell>
-                    <ActiveBadge active={u.isActive} />
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    <RelativeTime value={u.lastLogin} />
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    <RelativeTime value={u.createdAt} fallback="—" />
-                  </TableCell>
-                  <TableCell className="pr-4 text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon-sm" aria-label={`Actions for ${u.name}`} disabled={!u.canManage}>
-                          <MoreHorizontal />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48">
-                        <DropdownMenuItem onSelect={() => setDialog({ mode: "edit", user: u })}>
-                          <Pencil />
-                          Edit user
-                        </DropdownMenuItem>
-                        {!u.isSelf && (
-                          <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem variant={u.isActive ? "destructive" : "default"} onSelect={() => setConfirm(u)}>
-                              <Power />
-                              {u.isActive ? "Deactivate" : "Reactivate"}
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-
-        {data && users.length === 0 && (
-          <div className="flex flex-col items-center gap-2 px-6 py-12 text-center">
-            {hasFilters ? <SearchX className="size-6 text-muted-foreground" aria-hidden="true" /> : <Users className="size-6 text-muted-foreground" aria-hidden="true" />}
-            <p className="font-medium">{hasFilters ? "No users match these filters" : "No users yet"}</p>
-            <p className="text-sm text-muted-foreground">{hasFilters ? "Try another name, role or status." : "Add the first person to this workspace."}</p>
-          </div>
-        )}
-
-        {data && data.pagination.total > 0 && (
-          <Pagination page={data.pagination.page} pages={data.pagination.pages} total={data.pagination.total} label={data.pagination.total === 1 ? "user" : "users"} onPage={setPage} />
-        )}
-      </div>
+      ) : (
+        data && (
+          <DataTable
+            key={entry.id}
+            data={users}
+            columns={columns}
+            columnLabels={columnLabels}
+            groupOptions={GROUP_OPTIONS}
+            searchPlaceholder="Search users..."
+            emptyMessage="No users match the current filters."
+            exportFileName="users.csv"
+            defaultManagedColumn="name"
+            initialState={initialState}
+            rowClassName={(row) => !row.original.isActive && "text-muted-foreground"}
+            filters={(table) => (
+              <>
+                <MonthYearFilter table={table} columnId="createdAt" />
+                <SelectFilter table={table} columnId="role" options={ROLE_OPTIONS} allLabel="All roles" />
+                <SelectFilter table={table} columnId="status" options={STATUS_OPTIONS} allLabel="All statuses" />
+              </>
+            )}
+          />
+        )
+      )}
 
       <UserDialog
         open={Boolean(dialog)}
