@@ -111,7 +111,7 @@ export const revertSchema = Joi.object({
 export const conflictsSchema = Joi.object({
   start: Joi.date().iso().required(),
   end: Joi.date().iso().greater(Joi.ref('start')).required(),
-  resourceIds: Joi.array().items(objectId).max(20).default([]),
+  resourceIds: Joi.array().items(objectId).max(100).default([]),
   excludeIds: Joi.array().items(Joi.string().max(64)).max(20).default([]),
 });
 
@@ -131,6 +131,7 @@ export const resourceSchema = Joi.object({
   color: hexColor.allow(null),
   description: Joi.string().trim().max(300).allow(''),
   order: Joi.number().integer().min(0).max(10_000),
+  exclusive: Joi.boolean(),
 });
 
 export const rangeQuerySchema = Joi.object({

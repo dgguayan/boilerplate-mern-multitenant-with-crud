@@ -197,7 +197,7 @@ export function CategoryManager({ open, onOpenChange }) {
 /* -------------------------------------------------------------------------- */
 
 const RESOURCE_TYPES = ["room", "equipment", "person", "vehicle", "other"]
-const EMPTY_RESOURCE = { name: "", type: "room", capacity: "", color: CATEGORY_COLORS[7], description: "" }
+const EMPTY_RESOURCE = { name: "", type: "room", capacity: "", color: CATEGORY_COLORS[7], description: "", exclusive: false }
 
 export function ResourceManager({ open, onOpenChange }) {
   const { resources, reload, confirm } = useCalendar()
@@ -213,7 +213,7 @@ export function ResourceManager({ open, onOpenChange }) {
   const startEdit = (resource) => {
     setEditing(resource || "new")
     setError(null)
-    setValues(resource ? { name: resource.name, type: resource.type, capacity: resource.capacity ?? "", color: resource.color || CATEGORY_COLORS[7], description: resource.description || "" } : EMPTY_RESOURCE)
+    setValues(resource ? { name: resource.name, type: resource.type, capacity: resource.capacity ?? "", color: resource.color || CATEGORY_COLORS[7], description: resource.description || "", exclusive: Boolean(resource.exclusive) } : EMPTY_RESOURCE)
   }
 
   const save = async (e) => {
@@ -258,7 +258,7 @@ export function ResourceManager({ open, onOpenChange }) {
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Rooms and resources</DialogTitle>
-          <DialogDescription>Resources can be booked on events and appear in the Resources view, where double-bookings are flagged.</DialogDescription>
+          <DialogDescription>Resources can be booked on events and appear in the Resources view. Double-bookings are flagged, or refused for resources that can't be shared.</DialogDescription>
         </DialogHeader>
         {editing ? (
           <form onSubmit={save} className="space-y-3" noValidate>
@@ -294,6 +294,15 @@ export function ResourceManager({ open, onOpenChange }) {
               </label>
               <input id="res-desc" className={fieldClass} value={values.description} maxLength={300} onChange={(e) => setValues({ ...values, description: e.target.value })} />
             </div>
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" className="mt-0.5" checked={values.exclusive} onChange={(e) => setValues({ ...values, exclusive: e.target.checked })} aria-describedby="res-exclusive-hint" />
+              <span>
+                <span className="font-medium">Prevent double booking</span>
+                <span id="res-exclusive-hint" className="block text-xs text-muted-foreground">
+                  An event that overlaps another booking of this resource can't be saved. Off: overlaps are allowed and flagged.
+                </span>
+              </span>
+            </label>
             {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setEditing(null)}>
@@ -316,6 +325,7 @@ export function ResourceManager({ open, onOpenChange }) {
                     <p className="truncate text-xs text-muted-foreground capitalize">
                       {r.type}
                       {r.capacity != null ? ` · capacity ${r.capacity}` : ""}
+                      {r.exclusive ? " · no double booking" : ""}
                     </p>
                   </div>
                   <Button variant="ghost" size="icon-sm" aria-label={`Edit ${r.name}`} onClick={() => startEdit(r)}>

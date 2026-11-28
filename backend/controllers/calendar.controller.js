@@ -138,7 +138,12 @@ export const deleteEvent = handle(async (req, res) => {
 export const duplicateEvent = handle(async (req, res) => {
   const result = await calendar.duplicateEvent({ user: req.user, id: req.params.id });
   logCalendar(req, 'event_duplicated', `Duplicated an event as “${result.event.title}”`, eventTarget(result.event));
-  return apiResponse.created(res, result, 'Event duplicated');
+  const dropped = result.droppedResources.length;
+  return apiResponse.created(
+    res,
+    result,
+    dropped ? `Event duplicated. ${dropped === 1 ? 'A room that can’t be double-booked was' : `${dropped} rooms that can’t be double-booked were`} left off the copy.` : 'Event duplicated'
+  );
 });
 
 export const revert = handle(async (req, res) => {

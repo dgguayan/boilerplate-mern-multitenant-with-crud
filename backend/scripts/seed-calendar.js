@@ -13,7 +13,8 @@
  *  - Details: banner images, colour overrides, location + map, online link, organizer, contact,
  *    capacity, registration deadline, free and paid prices, attachments, custom fields, tags,
  *    an imported event (externalUid) and view counts for the "Most viewed" sort
- *  - Resources of every type, a double-booked room (conflict) and a crowded day ("+N more")
+ *  - Resources of every type, a double-booked room (conflict) and a crowded day ("+N more");
+ *    the projector kit and van can't be double-booked
  *  - The public calendar turned on, so /p/acme and the embed widget have events to show
  *
  * Users and projects are not touched.
@@ -61,9 +62,9 @@ async function main() {
     { name: 'Boardroom', type: 'room', capacity: 12, color: '#2563eb', description: 'Floor 3, video conferencing', order: 0, ...owned },
     { name: 'Studio', type: 'room', capacity: 30, color: '#7c3aed', description: 'Floor 2, stage and seating', order: 1, ...owned },
     { name: 'Focus room', type: 'room', capacity: 4, color: '#059669', order: 2, ...owned },
-    { name: 'Projector kit', type: 'equipment', color: '#0891b2', description: 'Portable projector and screen', order: 3, ...owned },
+    { name: 'Projector kit', type: 'equipment', color: '#0891b2', description: 'Portable projector and screen', exclusive: true, order: 3, ...owned },
     { name: 'On-call engineer', type: 'person', color: '#f59e0b', description: 'Whoever holds the pager this week', order: 4, ...owned },
-    { name: 'Company van', type: 'vehicle', capacity: 8, color: '#db2777', order: 5, ...owned },
+    { name: 'Company van', type: 'vehicle', capacity: 8, color: '#db2777', exclusive: true, order: 5, ...owned },
     { name: 'Event tent', type: 'other', color: '#64748b', description: 'Outdoor 6×6 m tent', order: 6, ...owned },
   ]);
   const res = Object.fromEntries(resourceList.map((r) => [r.name, r._id]));

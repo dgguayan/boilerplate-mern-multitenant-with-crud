@@ -282,6 +282,7 @@ export async function createEvent({ user, data }) {
   if (!canCreate(user)) throw httpError(403, 'You do not have permission to create events.');
   const values = normaliseTimes(data);
   await checkReferences(user.tenantId, values);
+  await assertBookable(user, { status: 'published', timeZone: 'UTC', ...values });
   const event = await CalendarEvent.create({
     ...values,
     slug: makeSlug(values.title),
@@ -306,6 +307,7 @@ export async function updateEvent({ user, id, scope = 'all', occurrenceKey, data
   if (!isSeries || scope === 'all' || (scope === 'following' && occurrenceKey === firstKey(event))) {
     const before = snapshot(event);
     const values = normaliseTimes(data, event);
+    await assertBookable(user, { ...event.toObject(), ...values }, [event._id]);
     if (isSeries && values.recurrence === null) {
       // The series becomes a single event; its edited occurrences no longer apply.
       changes.push(...(await softDeleteOverrides(user, event._id)));
@@ -329,7 +331,9 @@ export async function updateEvent({ user, id, scope = 'all', occurrenceKey, data
     });
     if (existing) {
       const before = snapshot(existing);
-      Object.assign(existing, normaliseTimes({ ...data, recurrence: null }, existing), { updatedBy: user.userId });
+      const changed = normaliseTimes({ ...data, recurrence: null }, existing);
+      await assertBookable(user, { ...existing.toObject(), ...changed }, [existing._id, event._id]);
+      Object.assign(existing, changed, { updatedBy: user.userId });
       await existing.save();
       return { event: existing.toObject(), changes: [change(existing, before)] };
     }
@@ -337,6 +341,7 @@ export async function updateEvent({ user, id, scope = 'all', occurrenceKey, data
       { start: occurrence.start, end: occurrence.end, ...copyFields(event), ...data, recurrence: null, exdates: [] },
       {}
     );
+    await assertBookable(user, values, [event._id]);
     const override = await CalendarEvent.create({
       ...values,
       seriesId: event._id,
@@ -370,6 +375,7 @@ export async function updateEvent({ user, id, scope = 'all', occurrenceKey, data
     },
     {}
   );
+  await assertBookable(user, values, [event._id]);
   const newSeries = await CalendarEvent.create({
     ...values,
     slug: makeSlug(values.title),
@@ -460,6 +466,12 @@ export async function duplicateEvent({ user, id }) {
   if (!canCreate(user)) throw httpError(403, 'You do not have permission to create events.');
   const { event: source } = await getEvent({ user, id });
   const fields = copyFields(source);
+  // A copy at the same time would clash with the original on rooms that can't be shared.
+  const exclusive = new Set(
+    (await CalendarResource.find({ tenantId: user.tenantId, _id: { $in: fields.resourceIds || [] }, exclusive: true }).distinct('_id')).map(String)
+  );
+  const droppedResources = (fields.resourceIds || []).filter((r) => exclusive.has(String(r)));
+  fields.resourceIds = (fields.resourceIds || []).filter((r) => !exclusive.has(String(r)));
   const copy = await CalendarEvent.create({
     ...fields,
     recurrence: source.seriesId ? null : plain(source.recurrence),
@@ -469,7 +481,7 @@ export async function duplicateEvent({ user, id }) {
     tenantId: user.tenantId,
     createdBy: user.userId,
   });
-  return { event: copy.toObject(), changes: [change(copy, null)] };
+  return { event: copy.toObject(), changes: [change(copy, null)], droppedResources: droppedResources.map(String) };
 }
 
 /** Restores documents to earlier snapshots (undo / redo). `state: null` means deleted. */
@@ -522,6 +534,81 @@ export async function findConflicts({ user, start, end, resourceIds = [], exclud
       end: o.end,
       resourceIds: o.resourceIds.filter((r) => wanted.has(r)),
     }));
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                   Booking                                  */
+/* -------------------------------------------------------------------------- */
+
+const BOOKING_HORIZON_DAYS = 366;
+const MAX_CHECKED_OCCURRENCES = 500;
+
+/**
+ * Refuses an event that would double-book a resource marked "exclusive" (rooms and equipment
+ * that can't be shared). Resources that allow overlaps only ever produce warnings.
+ *
+ * @param proposed  the event as it will be saved: start, end, allDay, timeZone, recurrence,
+ *                  exdates, status, resourceIds
+ * @param excludeIds events not to count as clashes (the event itself and its series)
+ * @throws 409 with details.conflicts: [{ resourceId, resourceName, title, start, end }]
+ */
+export async function assertBookable(user, proposed, excludeIds = []) {
+  const ids = (proposed.resourceIds || []).map(String);
+  if (!ids.length || ['cancelled', 'draft'].includes(proposed.status)) return;
+  const exclusive = await CalendarResource.find({ tenantId: user.tenantId, deleted: false, exclusive: true, _id: { $in: ids } })
+    .select('name')
+    .lean();
+  if (!exclusive.length) return;
+
+  // The times this event will occupy: one interval, or each date of a series over the next year.
+  const start = new Date(proposed.start);
+  const horizon = DateTime.fromJSDate(start).plus({ days: BOOKING_HORIZON_DAYS }).toJSDate();
+  const intervals = proposed.recurrence?.freq
+    ? expandOccurrences({ ...proposed, start, end: new Date(proposed.end) }, start, horizon).slice(0, MAX_CHECKED_OCCURRENCES)
+    : [{ start, end: new Date(proposed.end) }];
+  if (!intervals.length) return;
+
+  const rangeStart = intervals[0].start;
+  const rangeEnd = intervals[intervals.length - 1].end;
+  const exclusiveIds = exclusive.map((r) => r._id);
+  const { occurrences } = await expandRange({
+    filter: { tenantId: user.tenantId, deleted: false, status: { $nin: ['cancelled', 'draft'] }, resourceIds: { $in: exclusiveIds } },
+    start: rangeStart,
+    end: rangeEnd,
+    user: { ...user, role: 'superadmin' },
+  });
+  const skip = new Set(excludeIds.filter(Boolean).map(String));
+  const names = new Map(exclusive.map((r) => [String(r._id), r.name]));
+  const visible = new Set(
+    (await CalendarEvent.find({ ...(await accessFilter(user)), _id: { $in: occurrences.map((o) => o.eventId) } }).distinct('_id')).map(String)
+  );
+
+  const clashes = [];
+  for (const o of occurrences) {
+    if (skip.has(o.eventId) || skip.has(o.seriesId)) continue;
+    const oStart = new Date(o.start);
+    const oEnd = new Date(o.end);
+    if (!intervals.some((i) => i.start < oEnd && oStart < i.end)) continue;
+    for (const resourceId of o.resourceIds.filter((r) => names.has(r) && ids.includes(r))) {
+      clashes.push({
+        resourceId,
+        resourceName: names.get(resourceId),
+        // People who can't see the other event learn only that the room is taken.
+        title: visible.has(o.eventId) ? o.title : 'Busy',
+        start: o.start,
+        end: o.end,
+      });
+    }
+    if (clashes.length >= 10) break;
+  }
+  if (!clashes.length) return;
+
+  const first = clashes[0];
+  const when = DateTime.fromJSDate(new Date(first.start)).setZone(proposed.timeZone || 'UTC').toFormat("ccc, LLL d 'at' h:mm a");
+  const more = clashes.length > 1 ? ` and ${clashes.length - 1} more clash${clashes.length === 2 ? '' : 'es'}` : '';
+  throw Object.assign(httpError(409, `${first.resourceName} is already booked: “${first.title}” on ${when}${more}. It can't be double-booked.`), {
+    details: { conflicts: clashes },
+  });
 }
 
 /* -------------------------------------------------------------------------- */

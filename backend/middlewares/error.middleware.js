@@ -12,6 +12,8 @@ const errorMiddleware = (err, req, res, next) => {
   res.status(status).json({
     success: false,
     message,
+    // Structured detail a client can act on, e.g. the bookings a double booking clashed with.
+    ...(err.details && status < 500 && { details: err.details }),
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
 };
