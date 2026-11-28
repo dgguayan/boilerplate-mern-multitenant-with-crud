@@ -504,8 +504,8 @@ export function EventFormSheet() {
                             className={cn(
                               "ml-auto shrink-0 rounded-full px-1.5 text-[0.7rem] font-medium",
                               state === "Free" && "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-                              state === "Busy" && "bg-amber-500/10 text-amber-800 dark:text-amber-300",
-                              state === "Taken" && "bg-destructive/10 text-destructive"
+                              state === "Busy" && "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+                              state === "Taken" && "bg-red-500/10 text-red-700 dark:text-red-400"
                             )}
                             title={state === "Taken" ? "Booked, and can't be double-booked" : state === "Busy" ? "Booked, but can be shared" : "Free at this time"}
                           >
@@ -517,9 +517,14 @@ export function EventFormSheet() {
                     )
                   })}
                 </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">No rooms or equipment have been set up yet.</p>
+              ) : null}
+              {resources.length > 0 && conflictKey && (
+                <p className="text-xs text-muted-foreground">
+                  At this time: <strong className="font-medium">Free</strong> · <strong className="font-medium">Busy</strong> (already booked, can be shared) ·{" "}
+                  <strong className="font-medium">Taken</strong> (already booked, can't be double-booked)
+                </p>
               )}
+              {resources.length === 0 && <p className="text-sm text-muted-foreground">No rooms or equipment have been set up yet.</p>}
               {selectedConflicts.length > 0 && (
                 <div
                   role={blocking.length ? "alert" : "status"}

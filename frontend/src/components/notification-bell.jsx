@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Skeleton } from "@/components/ui/skeleton"
+import { toast } from "sonner"
 
 const TYPE_ICON = {
   event_reminder: AlarmClock,
@@ -51,6 +52,7 @@ export function NotificationBell() {
     if (!open) return
     let cancelled = false
     setError(null)
+    setItems(null)
     notificationsApi
       .getNotifications({ limit: 20 })
       .then((res) => {
@@ -82,7 +84,15 @@ export function NotificationBell() {
     try {
       await notificationsApi.markAllRead()
     } catch {
-      refreshCount()
+      toast.error("Couldn't mark notifications as read.")
+      // Show the real state again.
+      notificationsApi
+        .getNotifications({ limit: 20 })
+        .then((res) => {
+          setItems(res.data.data.notifications)
+          setUnread(res.data.data.unread)
+        })
+        .catch(() => refreshCount())
     }
   }
 
@@ -103,9 +113,9 @@ export function NotificationBell() {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-[min(24rem,calc(100vw-2rem))] p-0">
+      <PopoverContent align="end" aria-label="Notifications" className="w-[min(24rem,calc(100vw-2rem))] p-0">
         <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
-          <h2 className="text-sm font-semibold">Notifications</h2>
+          <p className="text-sm font-semibold">Notifications</p>
           <Button variant="ghost" size="sm" onClick={markAll} disabled={!unread}>
             <CheckCheck data-icon="inline-start" />
             Mark all read

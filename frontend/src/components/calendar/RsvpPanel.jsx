@@ -7,12 +7,13 @@ import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import { downloadCsv, toCsv } from "@/lib/csv"
 
 export const RSVP_META = {
   going: { label: "Going", icon: Check },
   maybe: { label: "Maybe", icon: CircleHelp },
   declined: { label: "Can't go", icon: X },
-  waitlist: { label: "Waitlist", icon: Hourglass },
+  waitlist: { label: "On the waitlist", icon: Hourglass },
 }
 const ANSWERS = ["going", "maybe", "declined"]
 
@@ -32,12 +33,6 @@ function summaryLine(s) {
   return parts.join(" · ")
 }
 
-function toCsv(rows) {
-  const esc = (v) => `"${String(v ?? "").replaceAll('"', '""')}"`
-  return [["Name", "Email", "Reply", "Note", "Replied at"], ...rows.map((r) => [r.name, r.email, RSVP_META[r.status]?.label, r.note, r.respondedAt])]
-    .map((row) => row.map(esc).join(","))
-    .join("\n")
-}
 
 function Attendees({ target, title }) {
   const [list, setList] = useState(null)
@@ -55,12 +50,8 @@ function Attendees({ target, title }) {
   }, [target.id, target.occurrence])
 
   const exportCsv = () => {
-    const url = URL.createObjectURL(new Blob([toCsv(list)], { type: "text/csv;charset=utf-8" }))
-    const link = document.createElement("a")
-    link.href = url
-    link.download = `${title.replace(/[^\w.-]+/g, "-").slice(0, 60) || "event"}-replies.csv`
-    link.click()
-    URL.revokeObjectURL(url)
+    const rows = [["Name", "Email", "Reply", "Note", "Replied at"], ...list.map((r) => [r.name, r.email, RSVP_META[r.status]?.label, r.note, r.respondedAt])]
+    downloadCsv(`${title.replace(/[^\w.-]+/g, "-").slice(0, 60) || "event"}-replies.csv`, toCsv(rows))
   }
 
   if (error) return <p role="alert" className="text-sm text-destructive">{error}</p>
@@ -88,7 +79,7 @@ function Attendees({ target, title }) {
       </ul>
       <Button variant="outline" size="sm" onClick={exportCsv}>
         <Download data-icon="inline-start" />
-        Export replies (CSV)
+        Export CSV
       </Button>
     </div>
   )
@@ -142,7 +133,7 @@ export function RsvpPanel({ occ, onChanged }) {
   return (
     <section aria-labelledby="rsvp-heading" className="space-y-2 border-b px-4 py-3">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h3 id="rsvp-heading" className="text-sm font-semibold">
+        <h3 id="rsvp-heading" className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
           Are you going?
         </h3>
         {summary && <p className="text-xs text-muted-foreground" aria-live="polite">{summaryLine(summary)}</p>}
@@ -156,7 +147,7 @@ export function RsvpPanel({ occ, onChanged }) {
           <div role="group" aria-label="Your reply" className="grid grid-cols-3 gap-2">
             {ANSWERS.map((status) => {
               const meta = RSVP_META[status]
-              const disabled = Boolean(saving) || (status !== "declined" && !summary.open) || (status === "declined" && summary.reason === "This event has ended.")
+              const disabled = Boolean(saving) || (status !== "declined" && !summary.open) || (status === "declined" && summary.ended)
               return (
                 <Button
                   key={status}

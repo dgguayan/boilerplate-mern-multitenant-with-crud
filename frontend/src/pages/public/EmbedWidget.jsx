@@ -38,7 +38,6 @@ export default function EmbedWidget() {
 
   return (
     // Colours come from ?theme= (see embedTheme in App.jsx), not the visitor's app setting.
-    <div>
       <div className="min-h-svh bg-background p-3 text-foreground">
         <div className="mb-2 flex items-center justify-between gap-2">
           <h1 className="flex items-center gap-1.5 text-sm font-semibold">
@@ -51,7 +50,7 @@ export default function EmbedWidget() {
           </a>
         </div>
 
-        {error && <p className="text-sm text-muted-foreground">{error}</p>}
+        {error && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
         {!data && !error && (
           <div className="space-y-2" aria-busy="true">
             {Array.from({ length: Math.min(limit, 4) }, (_, i) => (
@@ -91,6 +90,5 @@ export default function EmbedWidget() {
           })}
         </ul>
       </div>
-    </div>
   )
 }

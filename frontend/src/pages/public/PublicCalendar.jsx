@@ -121,6 +121,7 @@ export default function PublicCalendar() {
   useEffect(() => {
     let cancelled = false
     setError(null)
+    setData(null)
     const start = DateTime.now().startOf("day")
     publicApi
       .getPublicEvents(tenant, { start: start.toUTC().toISO(), end: start.plus({ days: WINDOW_DAYS }).toUTC().toISO(), category: category || undefined })

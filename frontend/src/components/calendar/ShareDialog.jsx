@@ -15,6 +15,7 @@ function CopyField({ id, label, value, hint, multiline = false }) {
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(value)
+      toast.success(`${label} copied`)
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     } catch {
@@ -54,11 +55,15 @@ export function ShareDialog({ open, onOpenChange }) {
 
   useEffect(() => {
     if (!open) return
+    let cancelled = false
     setError(null)
     calendarApi
       .getSharing()
-      .then((res) => setSharing(res.data.data))
-      .catch((err) => setError(calendarApi.errorMessage(err, "Couldn't load sharing settings.")))
+      .then((res) => !cancelled && setSharing(res.data.data))
+      .catch((err) => !cancelled && setError(calendarApi.errorMessage(err, "Couldn't load sharing settings.")))
+    return () => {
+      cancelled = true
+    }
   }, [open])
 
   const toggle = async () => {

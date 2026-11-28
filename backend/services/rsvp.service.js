@@ -120,6 +120,8 @@ async function summarize(user, target) {
     counts,
     mine: mine ? { status: mine.status, note: mine.note || '', waitlistPosition, updatedAt: mine.updatedAt } : null,
     ...registrationState(target),
+    // "Can't go" stays possible until the event ends.
+    ended: new Date(target.end) <= new Date(),
     canSeeAttendees: canEditEvent(user, target.event),
   };
 }

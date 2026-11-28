@@ -100,7 +100,7 @@ function BarList({ items, format = integer.format, max }) {
         return (
           <li key={item.label} className="grid grid-cols-[minmax(6rem,9rem)_1fr] items-center gap-3 text-sm" title={text}>
             <span className="truncate text-muted-foreground">{item.label}</span>
-            <div className="flex items-center gap-2" tabIndex={0} aria-label={text}>
+            <div className="flex items-center gap-2" role="img" tabIndex={0} aria-label={text}>
               <div className="relative h-3 flex-1">
                 <div className="absolute inset-y-0 left-0 rounded-r-[4px] bg-chart-1" style={{ width: `${Math.max(width, item.value ? 1.5 : 0)}%` }} />
               </div>
@@ -119,9 +119,16 @@ function Columns({ items }) {
   const peak = items.reduce((best, i, idx) => (i.value > items[best].value ? idx : best), 0)
   return (
     <div>
-      <div className="flex h-40 items-end gap-[2px] border-b" role="img" aria-label={`Events per week, peak ${items[peak]?.value ?? 0} in the week of ${items[peak]?.label ?? ""}`}>
+      <div className="flex h-40 items-end gap-[2px] border-b" role="list" aria-label={`Events per week, peak ${items[peak]?.value ?? 0} in the week of ${items[peak]?.label ?? ""}`}>
         {items.map((item, idx) => (
-          <div key={item.label} className="group relative flex h-full flex-1 flex-col items-center justify-end" title={`Week of ${item.label}: ${item.value}`} tabIndex={0}>
+          <div
+            key={item.label}
+            role="listitem"
+            aria-label={`Week of ${item.label}: ${item.value} events`}
+            className="group relative flex h-full flex-1 flex-col items-center justify-end"
+            title={`Week of ${item.label}: ${item.value}`}
+            tabIndex={0}
+          >
             {(idx === peak || idx === items.length - 1) && item.value > 0 && (
               <span className="mb-1 text-[0.7rem] tabular-nums text-muted-foreground">{item.value}</span>
             )}
@@ -259,7 +266,7 @@ export default function CalendarInsights() {
                 items={[
                   { label: "Going", value: data.replies.going },
                   { label: "Maybe", value: data.replies.maybe },
-                  { label: "Waitlist", value: data.replies.waitlist },
+                  { label: "On the waitlist", value: data.replies.waitlist },
                   { label: "Can't go", value: data.replies.declined },
                 ]}
               />

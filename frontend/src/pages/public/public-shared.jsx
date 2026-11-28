@@ -1,9 +1,9 @@
 import { useEffect } from "react"
 import { Link } from "react-router-dom"
 import { DateTime } from "luxon"
-import { Ban, CalendarDays, PauseCircle } from "lucide-react"
+import { CalendarDays } from "lucide-react"
 
-import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/calendar/ui"
 
 /** The visitor's own time zone; public pages show times where the reader is. */
 export const visitorZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
@@ -31,22 +31,9 @@ export function formatPrice(price) {
   return new Intl.NumberFormat(undefined, { style: "currency", currency: price.currency || "USD" }).format(price.amount)
 }
 
+/** Cancelled / postponed, the same marker the app's calendar uses. Published shows nothing. */
 export function StatusPill({ status }) {
-  if (status === "cancelled")
-    return (
-      <Badge variant="destructive" className="gap-1">
-        <Ban className="size-3" aria-hidden="true" />
-        Cancelled
-      </Badge>
-    )
-  if (status === "postponed")
-    return (
-      <Badge variant="secondary" className="gap-1 bg-amber-500/15 text-amber-800 dark:text-amber-300">
-        <PauseCircle className="size-3" aria-hidden="true" />
-        Postponed
-      </Badge>
-    )
-  return null
+  return ["cancelled", "postponed"].includes(status) ? <StatusBadge status={status} /> : null
 }
 
 export function useDocumentTitle(title) {

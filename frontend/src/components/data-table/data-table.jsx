@@ -38,6 +38,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { features } from './features.js';
+import { csvCell, downloadCsv } from '@/lib/csv';
 import { clearTablePrefs, loadTablePrefs, sanitizeTablePrefs, saveTablePrefs } from './prefs.js';
 import { readTableUrlState, tableUrlStateKey, writeTableUrlState } from './url-state.js';
 
@@ -77,7 +78,6 @@ function stringifyCellValue(value) {
   return JSON.stringify(value);
 }
 
-const escapeCsv = (value) => `"${stringifyCellValue(value).replaceAll('"', '""')}"`;
 
 /**
  * Client-side data table: search, page-specific filters, advanced controls (grouping, density,
@@ -258,15 +258,10 @@ export function DataTable({
       ? selectedRows
       : table.getFilteredRowModel().flatRows.filter((row) => !row.getIsGrouped());
     const csv = [
-      exportColumns.map((column) => escapeCsv(columnLabels[column.id] ?? column.id)).join(','),
-      ...rows.map((row) => exportColumns.map((column) => escapeCsv(row.getValue(column.id))).join(',')),
+      exportColumns.map((column) => csvCell(columnLabels[column.id] ?? column.id)).join(','),
+      ...rows.map((row) => exportColumns.map((column) => csvCell(row.getValue(column.id))).join(',')),
     ].join('\n');
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = exportFileName;
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadCsv(exportFileName, csv);
   }
 
   async function copySelectedCells() {

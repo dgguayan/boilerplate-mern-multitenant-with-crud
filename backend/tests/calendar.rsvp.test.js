@@ -126,6 +126,7 @@ test('closed events: deadline, cancelled, past and drafts', async () => {
 
   const summary = (await api('u1', 'GET', `/events/${deadlinePassed._id}/rsvp`)).body.data;
   assert.equal(summary.open, false);
+  assert.equal(summary.ended, false);
   assert.match(summary.reason, /deadline/i);
 });
 

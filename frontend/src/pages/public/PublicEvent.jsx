@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { Link, useParams, useSearchParams } from "react-router-dom"
-import { ArrowLeft, CalendarPlus, ChevronDown, Clock, Download, ExternalLink, Mail, MapPin, Paperclip, Repeat, Share2, Tag, Ticket, User, Users, Video } from "lucide-react"
+import { ArrowLeft, Ban, CalendarPlus, ChevronDown, Clock, Download, ExternalLink, Mail, MapPin, Paperclip, Repeat, Share2, Tag, Ticket, User, Users, Video } from "lucide-react"
 import { toast } from "sonner"
 
 import * as publicApi from "@/api/public.api"
@@ -125,8 +125,18 @@ export default function PublicEvent() {
                 {event.summary && <p className="font-medium">{event.summary}</p>}
               </header>
 
-              {shown.status === "cancelled" && <p role="alert" className="rounded-lg border border-red-600/30 bg-red-600/10 p-3 text-sm">This event has been cancelled.</p>}
-              {shown.status === "postponed" && <p role="alert" className="rounded-lg border border-amber-600/30 bg-amber-500/10 p-3 text-sm">This event has been postponed. A new date will be announced.</p>}
+              {shown.status === "cancelled" && (
+                <div role="alert" className="flex items-start gap-2 rounded-lg border border-red-600/30 bg-red-600/10 p-3 text-sm">
+                  <Ban className="mt-0.5 size-4 shrink-0 text-red-700 dark:text-red-400" aria-hidden="true" />
+                  This event has been cancelled.
+                </div>
+              )}
+              {shown.status === "postponed" && (
+                <div role="alert" className="flex items-start gap-2 rounded-lg border border-amber-600/30 bg-amber-500/10 p-3 text-sm">
+                  <Clock className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-400" aria-hidden="true" />
+                  This event has been postponed. A new date will be announced.
+                </div>
+              )}
 
               <div className="flex flex-wrap gap-2">
                 <DropdownMenu>
