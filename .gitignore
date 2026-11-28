@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+coverage/
+
+# Local environment (frontend/.env holds only the public API URL and stays tracked)
+.env.local
+.env.*.local
+backend/.env
+
+# Logs and OS files
+*.log
+.DS_Store
+Thumbs.db
