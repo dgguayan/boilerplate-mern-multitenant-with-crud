@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { useTable } from '@tanstack/react-table';
 import {
   ChevronDown,
@@ -20,6 +21,7 @@ import {
   Rows3,
   Search,
   SlidersHorizontal,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -36,6 +38,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { features } from './features.js';
+import { clearTablePrefs, loadTablePrefs, sanitizeTablePrefs, saveTablePrefs } from './prefs.js';
+import { readTableUrlState, tableUrlStateKey, writeTableUrlState } from './url-state.js';
 
 const densityClasses = {
   compact: 'h-9 py-1',
@@ -44,6 +48,10 @@ const densityClasses = {
 };
 
 const NON_DATA_COLUMNS = ['select', 'actions'];
+const DEFAULT_PAGE_SIZE = 10;
+const URL_WRITE_MARK = 'dataTableUrlWrite';
+
+const columnIdOf = (column) => column.id ?? column.accessorKey;
 
 // Divider on the inner edge of a pinned column: right edge when pinned left, left edge when pinned right.
 const pinnedEdgeClass = (pinned) =>
@@ -88,6 +96,11 @@ const escapeCsv = (value) => `"${stringifyCellValue(value).replaceAll('"', '""')
  * @param {string}   props.defaultManagedColumn  column picked in the reorder / pin control
  * @param {object}   [props.initialState]
  * @param {(row) => string | false} [props.rowClassName]  extra classes for a data row
+ * @param {string}   [props.storageKey]   remember this viewer's column layout, page size and density
+ *                                        in this browser under this key
+ * @param {boolean}  [props.syncUrl]      keep the search text and filters in the URL (?q=…&<columnId>=…)
+ * @param {(rows: object[], clearSelection: () => void) => React.ReactNode} [props.bulkActions]
+ *        buttons shown in a bar while rows are selected; receives the selected rows' data
  */
 export function DataTable({
   data,
@@ -101,10 +114,38 @@ export function DataTable({
   defaultManagedColumn,
   initialState,
   rowClassName,
+  storageKey,
+  syncUrl = false,
+  bulkActions,
 }) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const columnIds = useMemo(() => columns.map(columnIdOf).filter(Boolean), [columns]);
+  const filterableIds = useMemo(
+    () => columns.filter((column) => column.filterFn).map(columnIdOf).filter(Boolean),
+    [columns],
+  );
+
+  // Read once, on mount: saved layout and the URL's filters seed the table's first state.
+  const [startup] = useState(() => {
+    const prefs = sanitizeTablePrefs(loadTablePrefs(storageKey), columnIds);
+    const url = syncUrl ? readTableUrlState(searchParams, filterableIds) : null;
+    return { prefs, url };
+  });
+
   const [advancedControlsOpen, setAdvancedControlsOpen] = useState(false);
-  const [density, setDensity] = useState('compact');
+  const [density, setDensity] = useState(startup.prefs.density ?? 'compact');
   const [managedColumnId, setManagedColumnId] = useState(defaultManagedColumn);
+
+  // The row-actions column always starts pinned to the right edge.
+  const defaultPinning = {
+    start: initialState?.columnPinning?.start ?? [],
+    end: initialState?.columnPinning?.end?.length
+      ? initialState.columnPinning.end
+      : columnIds.includes('actions')
+        ? ['actions']
+        : [],
+  };
 
   const table = useTable({
     features,
@@ -117,19 +158,60 @@ export function DataTable({
     getRowId: (row) => String(row._id),
     groupedColumnMode: false,
     initialState: {
-      pagination: { pageIndex: 0, pageSize: 10 },
       ...initialState,
-      // The row-actions column always starts pinned to the right edge.
-      columnPinning: {
-        start: initialState?.columnPinning?.start ?? [],
-        end: initialState?.columnPinning?.end?.length
-          ? initialState.columnPinning.end
-          : columns.some((column) => column.id === 'actions')
-            ? ['actions']
-            : [],
-      },
+      pagination: { pageIndex: 0, pageSize: startup.prefs.pageSize ?? DEFAULT_PAGE_SIZE },
+      columnPinning: startup.prefs.columnPinning ?? defaultPinning,
+      ...(startup.prefs.columnVisibility && { columnVisibility: startup.prefs.columnVisibility }),
+      ...(startup.prefs.columnOrder && { columnOrder: startup.prefs.columnOrder }),
+      ...(startup.prefs.columnSizing && { columnSizing: startup.prefs.columnSizing }),
+      ...(startup.url?.columnFilters.length && { columnFilters: startup.url.columnFilters }),
+      ...(startup.url?.globalFilter && { globalFilter: startup.url.globalFilter }),
     },
   });
+
+  // ── Remember the layout ────────────────────────────────
+  const { columnVisibility, columnOrder, columnSizing, columnPinning } = table.state;
+  const pageSize = table.state.pagination.pageSize;
+  const prefsJson = JSON.stringify({ columnVisibility, columnOrder, columnSizing, columnPinning, pageSize, density });
+  const skipFirstSave = useRef(true);
+  useEffect(() => {
+    if (skipFirstSave.current) {
+      skipFirstSave.current = false;
+      return;
+    }
+    saveTablePrefs(storageKey, JSON.parse(prefsJson));
+  }, [storageKey, prefsJson]);
+
+  // ── Keep search and filters in the URL ─────────────────
+  const tableUrlState = { globalFilter: table.state.globalFilter ?? '', columnFilters: table.state.columnFilters };
+  const stateKey = tableUrlStateKey(tableUrlState);
+  const urlState = syncUrl ? readTableUrlState(searchParams, filterableIds) : null;
+  const urlKey = urlState ? tableUrlStateKey(urlState) : null;
+  const latest = useRef({});
+  latest.current = { table, tableUrlState, urlState, stateKey, urlKey, searchParams };
+
+  // table → URL, when the viewer changes a filter. The entry is marked as written by the table, so
+  // the effect below never feeds a stale echo back while the viewer is still typing.
+  useEffect(() => {
+    if (!syncUrl) return;
+    const { tableUrlState: current, urlKey: inUrl, searchParams: params } = latest.current;
+    if (stateKey === inUrl) return;
+    setSearchParams(writeTableUrlState(params, filterableIds, current), { replace: true, state: { [URL_WRITE_MARK]: true } });
+  }, [syncUrl, stateKey, filterableIds, setSearchParams]);
+
+  // URL → table, only when something else changed the address: a link, or another page's code
+  const writtenByTable = Boolean(location.state?.[URL_WRITE_MARK]);
+  useEffect(() => {
+    if (!syncUrl || writtenByTable) return;
+    const { urlState: fromUrl, stateKey: current } = latest.current;
+    if (urlKey === current) return;
+    const { table: tableNow } = latest.current;
+    tableNow.setColumnFilters(fromUrl.columnFilters);
+    tableNow.setGlobalFilter(fromUrl.globalFilter);
+    tableNow.setPageIndex(0);
+    // Runs only when the URL itself changes: `table` is a new object on every render, so it is read
+    // through the ref instead of being a dependency (as one, it re-applied a stale URL mid-typing).
+  }, [syncUrl, urlKey, writtenByTable]);
 
   const managedColumn = table.getColumn(managedColumnId);
   const orderedColumnIds = table.state.columnOrder.length
@@ -150,14 +232,16 @@ export function DataTable({
   function resetTable() {
     table.resetCellSelection(true);
     table.resetColumnFilters(true);
-    table.resetColumnOrder(true);
-    table.resetColumnPinning();
-    table.resetColumnSizing(true);
-    table.resetColumnVisibility();
+    // Back to the page's defaults, not to the layout saved in this browser.
+    table.setColumnOrder([]);
+    table.setColumnPinning(defaultPinning);
+    table.setColumnSizing({});
+    table.setColumnVisibility(initialState?.columnVisibility ?? {});
+    clearTablePrefs(storageKey);
     table.resetExpanded(true);
     table.resetGlobalFilter(true);
     table.resetGrouping(true);
-    table.resetPagination();
+    table.setPagination({ pageIndex: 0, pageSize: DEFAULT_PAGE_SIZE });
     table.resetRowPinning(true);
     table.resetRowSelection(true);
     table.resetSorting();
@@ -270,6 +354,9 @@ export function DataTable({
   const bottomRows = table.getBottomRows();
   const selectedCellCount = table.getSelectedCellCount();
   const managedColumns = table.getAllLeafColumns().filter((column) => !NON_DATA_COLUMNS.includes(column.id));
+  // Only selected rows the current filters still show; hidden rows are never acted on.
+  const selectedRows = table.getFilteredSelectedRowModel().flatRows.filter((row) => !row.getIsGrouped());
+  const clearSelection = () => table.resetRowSelection(true);
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
@@ -432,6 +519,28 @@ export function DataTable({
           </div>
         </CollapsibleContent>
       </Collapsible>
+
+      {/* ── Bulk actions ── */}
+      {bulkActions && selectedRows.length > 0 && (
+        <div
+          role="region"
+          aria-label="Bulk actions"
+          className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/50 px-3 py-2 text-sm"
+        >
+          <span className="font-medium" aria-live="polite">
+            {selectedRows.length} selected
+          </span>
+          <span className="text-muted-foreground">·</span>
+          {bulkActions(
+            selectedRows.map((row) => row.original),
+            clearSelection,
+          )}
+          <Button variant="ghost" size="sm" className="ml-auto" onClick={clearSelection}>
+            <X className="size-4" />
+            Clear selection
+          </Button>
+        </div>
+      )}
 
       {/* ── Table ── */}
       <div

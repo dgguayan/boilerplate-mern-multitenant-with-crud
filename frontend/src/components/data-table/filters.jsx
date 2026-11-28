@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -114,9 +114,16 @@ export function SelectFilter({ table, columnId, options, allLabel }) {
     return found;
   }, [rows, columnId]);
 
+  // A value no option has (e.g. a stale or mistyped link) would filter with a blank control: drop it.
+  const value = column?.getFilterValue();
+  const known = value === undefined || options.some((option) => option.value === value);
+  useEffect(() => {
+    if (!known) column?.setFilterValue(undefined);
+  }, [known, column]);
+
   return (
     <Select
-      value={column?.getFilterValue() ?? 'all'}
+      value={known && value !== undefined ? value : 'all'}
       onValueChange={(value) => {
         column?.setFilterValue(value === 'all' ? undefined : value);
         table.setPageIndex(0);

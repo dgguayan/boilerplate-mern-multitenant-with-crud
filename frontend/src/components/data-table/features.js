@@ -21,17 +21,11 @@ import {
   stockFeatures,
   tableFeatures,
 } from '@tanstack/react-table';
+import { matchesMonthYear } from './match.js';
 
 // Filter value: { month: 0-11 | undefined, year: number | undefined }
 const filterFn_inMonthYear = constructFilterFn({
-  filter: (dataValue, filterValue) => {
-    if (!dataValue) return false;
-    const date = new Date(dataValue);
-    if (Number.isNaN(date.getTime())) return false;
-    if (filterValue.year !== undefined && date.getFullYear() !== filterValue.year) return false;
-    if (filterValue.month !== undefined && date.getMonth() !== filterValue.month) return false;
-    return true;
-  },
+  filter: matchesMonthYear,
   autoRemove: (val) => !val || (val.month === undefined && val.year === undefined),
 });
 
