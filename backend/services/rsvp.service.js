@@ -200,3 +200,48 @@ export async function myAnswers(user, occurrences) {
 }
 
 export const answerKey = (occ) => `${occ.seriesId || occ.eventId}|${occ.recurrenceKey ?? ''}`;
+
+/* ── Helpers for notifications and event edits ───────────── */
+
+/**
+ * Which occurrences of an event an edit or a notice is about.
+ * @typedef {{ all: true } | { key: string|null } | { from: string }} KeyScope
+ */
+const keyMatch = (scope) =>
+  scope.all ? {} : scope.from ? { occurrenceKey: { $gte: scope.from } } : { occurrenceKey: scope.key ?? null };
+
+/** People who said going, maybe or joined the waitlist — the ones an event change affects. */
+export async function repliers(tenantId, rootId, scope) {
+  return CalendarRsvp.find({ tenantId, eventId: rootId, status: { $in: ['going', 'maybe', 'waitlist'] }, ...keyMatch(scope) })
+    .select('userId occurrenceKey status')
+    .lean();
+}
+
+/** When "this and following" splits a series, later answers move to the new series. */
+export async function moveAnswers(tenantId, fromRootId, toRootId, fromKey) {
+  const res = await CalendarRsvp.updateMany(
+    { tenantId, eventId: fromRootId, occurrenceKey: { $gte: fromKey } },
+    { eventId: toRootId }
+  );
+  return res.modifiedCount;
+}
+
+/**
+ * Re-applies capacity to every occurrence with a waitlist (after capacity was raised, say).
+ * @returns {Promise<{ userId: string, key: string|null }[]>} people who got a place
+ */
+export async function rebalanceEvent(user, rootId, scope) {
+  const keys = await CalendarRsvp.distinct('occurrenceKey', { tenantId: user.tenantId, eventId: rootId, status: 'waitlist', ...keyMatch(scope) });
+  const promoted = [];
+  for (const key of keys) {
+    let target;
+    try {
+      target = await resolveTarget(user, String(rootId), key ?? undefined);
+    } catch {
+      continue; // the occurrence no longer exists
+    }
+    if (registrationState(target).open === false && new Date(target.start) <= new Date()) continue;
+    for (const userId of await rebalance(user, target)) promoted.push({ userId, key });
+  }
+  return promoted;
+}

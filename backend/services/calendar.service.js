@@ -270,6 +270,14 @@ export async function getEvent({ user, id, countView = false }) {
   return { event: { ...event, canEdit: canEditEvent(user, event) }, series };
 }
 
+/** The bare facts of an event before a change (for notifications); null when not found. */
+export async function peekEvent(user, id) {
+  if (!mongoose.isValidObjectId(id)) return null;
+  return CalendarEvent.findOne({ _id: id, tenantId: user.tenantId, deleted: false })
+    .select('title start end allDay timeZone recurrence seriesId recurrenceKey status location virtualUrl')
+    .lean();
+}
+
 export async function createEvent({ user, data }) {
   if (!canCreate(user)) throw httpError(403, 'You do not have permission to create events.');
   const values = normaliseTimes(data);

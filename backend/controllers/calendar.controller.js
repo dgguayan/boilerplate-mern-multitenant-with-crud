@@ -1,5 +1,6 @@
 import * as calendar from '../services/calendar.service.js';
 import * as rsvp from '../services/rsvp.service.js';
+import * as notifications from '../services/notification.service.js';
 import * as apiResponse from '../utils/apiResponse.js';
 import { audit } from '../utils/audit.js';
 import {
@@ -63,9 +64,38 @@ export const createEvent = handle(async (req, res) => {
   return apiResponse.created(res, { ...result, conflicts: await conflictsFor(req.user, result.event) }, 'Event created');
 });
 
+/**
+ * Where an edit's replies live and which occurrences it touched. A "this and following" split
+ * moves later replies onto the new series first, so nobody's answer is lost.
+ */
+async function repliesTouchedByEdit(req, result, scope, occurrenceKey) {
+  const ev = result.event;
+  if (ev.seriesId) return { rootId: ev.seriesId, keys: { key: ev.recurrenceKey } };
+  if (scope === 'following' && String(ev._id) !== req.params.id) {
+    await rsvp.moveAnswers(req.user.tenantId, req.params.id, ev._id, occurrenceKey);
+  }
+  return { rootId: ev._id, keys: { all: true } };
+}
+
 export const updateEvent = handle(async (req, res) => {
   const { scope, occurrenceKey, data } = req.body;
   const result = await calendar.updateEvent({ user: req.user, id: req.params.id, scope, occurrenceKey, data });
+  const { rootId, keys } = await repliesTouchedByEdit(req, result, scope, occurrenceKey);
+  const change = notifications.describeEdit(data, result.changes[0]?.before);
+  if (change) {
+    await notifications.quietly('event change', () =>
+      notifications.noticeEventChange({ tenantId: req.user.tenantId, event: result.event, rootId, scope: keys, change, actorId: req.user.userId })
+    );
+  }
+  // More places (or none) may let people off the waitlist.
+  if ('capacity' in data) {
+    const promoted = await rsvp.rebalanceEvent(req.user, rootId, keys);
+    if (promoted.length) {
+      await notifications.quietly('waitlist', () =>
+        notifications.noticePromoted({ tenantId: req.user.tenantId, event: result.event, rootId, promoted })
+      );
+    }
+  }
   logCalendar(req, 'event_updated', `Updated event “${result.event.title}”${SCOPE_TEXT[scope] || ''}`, eventTarget(result.event), {
     scope,
     occurrence: occurrenceKey,
@@ -77,7 +107,28 @@ export const updateEvent = handle(async (req, res) => {
 export const deleteEvent = handle(async (req, res) => {
   const scope = ['this', 'following', 'all'].includes(req.query.scope) ? req.query.scope : 'all';
   const occurrenceKey = /^\d{4}-\d{2}-\d{2}$/.test(req.query.occurrence || '') ? req.query.occurrence : undefined;
+  const before = await calendar.peekEvent(req.user, req.params.id);
   const result = await calendar.deleteEvent({ user: req.user, id: req.params.id, scope, occurrenceKey });
+  if (before) {
+    // An edited occurrence answers for its own date; a series for the dates the scope covers.
+    const touched = before.seriesId
+      ? { rootId: before.seriesId, keys: { key: before.recurrenceKey } }
+      : before.recurrence?.freq && scope === 'this' && occurrenceKey
+            ? { rootId: before._id, keys: { key: occurrenceKey } }
+            : before.recurrence?.freq && scope === 'following' && occurrenceKey
+              ? { rootId: before._id, keys: { from: occurrenceKey } }
+              : { rootId: before._id, keys: { all: true } };
+    await notifications.quietly('event deleted', () =>
+      notifications.noticeEventChange({
+        tenantId: req.user.tenantId,
+        event: before,
+        rootId: touched.rootId,
+        scope: touched.keys,
+        change: { type: 'event_deleted' },
+        actorId: req.user.userId,
+      })
+    );
+  }
   const title = result.changes[0]?.before?.title || 'event';
   logCalendar(req, 'event_deleted', `Deleted event “${title}”${SCOPE_TEXT[scope] || ''}`, { type: 'event', id: req.params.id, label: title }, { scope, occurrence: occurrenceKey });
   return apiResponse.success(res, result, 'Event deleted');
@@ -205,7 +256,16 @@ export const setRsvp = handle(async (req, res) => {
     previous: result.previous,
     promoted: result.promoted.length || undefined,
   });
-  req.app.emit('calendar:rsvp', { user: req.user, ...result });
+  if (result.promoted.length) {
+    await notifications.quietly('waitlist', () =>
+      notifications.noticePromoted({
+        tenantId: req.user.tenantId,
+        event: result.target.event,
+        rootId: result.target.rootId,
+        promoted: result.promoted.map((userId) => ({ userId, key: result.target.key })),
+      })
+    );
+  }
   return apiResponse.success(res, result.summary, stored === 'waitlist' ? 'The event is full — you are on the waitlist' : 'Reply saved');
 });
 
