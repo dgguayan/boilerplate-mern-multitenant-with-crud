@@ -6,6 +6,7 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
+import { NotificationBell } from "@/components/notification-bell"
 
 function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme()
@@ -35,6 +36,7 @@ export function SiteHeader() {
     "/projects": "Projects",
     "/documents": "Documents",
     "/calendar": "Calendar",
+    "/calendar/insights": "Calendar insights",
     "/reports": "Reports",
     "/teams": "Teams",
     "/clients": "Clients",
@@ -60,7 +62,8 @@ export function SiteHeader() {
             <BreadcrumbItem><BreadcrumbPage>{page}</BreadcrumbPage></BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-1">
+          <NotificationBell />
           <ThemeToggle />
         </div>
       </div>

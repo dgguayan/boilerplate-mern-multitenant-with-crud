@@ -48,7 +48,7 @@ function keyProp(name, key, series) {
 
 const ICS_STATUS = { published: 'CONFIRMED', cancelled: 'CANCELLED', postponed: 'TENTATIVE', draft: 'TENTATIVE', archived: 'CONFIRMED' };
 
-function eventLines(event, { uidDomain, categoryName, series, appUrl }) {
+function eventLines(event, { uidDomain, categoryName, series, appUrl, eventUrl }) {
   const uid = event.externalUid || `${(series || event)._id}@${uidDomain}`;
   const lines = [
     'BEGIN:VEVENT',
@@ -67,7 +67,7 @@ function eventLines(event, { uidDomain, categoryName, series, appUrl }) {
   if (description) lines.push(`DESCRIPTION:${escapeText(description)}`);
   const location = [event.location?.name, event.location?.address].filter(Boolean).join(', ') || event.virtualUrl;
   if (location) lines.push(`LOCATION:${escapeText(location)}`);
-  const url = event.externalUrl || event.virtualUrl || (appUrl && `${appUrl}/calendar?event=${event._id}`);
+  const url = event.externalUrl || event.virtualUrl || (eventUrl ? eventUrl(series || event) : appUrl && `${appUrl}/calendar?event=${event._id}`);
   if (url) lines.push(`URL:${escapeText(url)}`);
   if (categoryName) lines.push(`CATEGORIES:${escapeText(categoryName)}`);
   if (event.organizer?.email) {
@@ -85,7 +85,7 @@ function eventLines(event, { uidDomain, categoryName, series, appUrl }) {
  * @param {object[]} events   series masters and single events
  * @param {object[]} overrides edited occurrences (seriesId set)
  */
-export function buildIcs({ events, overrides = [], calendarName, uidDomain, categories = new Map(), appUrl }) {
+export function buildIcs({ events, overrides = [], calendarName, uidDomain, categories = new Map(), appUrl, eventUrl }) {
   const seriesById = new Map(events.map((e) => [String(e._id), e]));
   const lines = [
     'BEGIN:VCALENDAR',
@@ -96,13 +96,13 @@ export function buildIcs({ events, overrides = [], calendarName, uidDomain, cate
     `X-WR-CALNAME:${escapeText(calendarName)}`,
   ];
   for (const event of events) {
-    lines.push(...eventLines(event, { uidDomain, categoryName: categories.get(String(event.categoryId)), appUrl }));
+    lines.push(...eventLines(event, { uidDomain, categoryName: categories.get(String(event.categoryId)), appUrl, eventUrl }));
   }
   for (const override of overrides) {
     const series = seriesById.get(String(override.seriesId));
     const categoryName = categories.get(String(override.categoryId));
-    if (series) lines.push(...eventLines(override, { uidDomain, categoryName, series, appUrl }));
-    else lines.push(...eventLines({ ...override, recurrenceKey: null }, { uidDomain, categoryName, appUrl }));
+    if (series) lines.push(...eventLines(override, { uidDomain, categoryName, series, appUrl, eventUrl }));
+    else lines.push(...eventLines({ ...override, recurrenceKey: null }, { uidDomain, categoryName, appUrl, eventUrl }));
   }
   lines.push('END:VCALENDAR');
   return lines.map(fold).join('\r\n') + '\r\n';

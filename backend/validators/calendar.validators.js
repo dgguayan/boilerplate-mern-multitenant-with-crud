@@ -111,7 +111,7 @@ export const revertSchema = Joi.object({
 export const conflictsSchema = Joi.object({
   start: Joi.date().iso().required(),
   end: Joi.date().iso().greater(Joi.ref('start')).required(),
-  resourceIds: Joi.array().items(objectId).max(20).default([]),
+  resourceIds: Joi.array().items(objectId).max(100).default([]),
   excludeIds: Joi.array().items(Joi.string().max(64)).max(20).default([]),
 });
 
@@ -131,6 +131,7 @@ export const resourceSchema = Joi.object({
   color: hexColor.allow(null),
   description: Joi.string().trim().max(300).allow(''),
   order: Joi.number().integer().min(0).max(10_000),
+  exclusive: Joi.boolean(),
 });
 
 export const rangeQuerySchema = Joi.object({
@@ -149,3 +150,11 @@ export function validateImportedEvent(draft) {
   const { value, error } = createEventSchema.validate(draft, { abortEarly: true, stripUnknown: true });
   return { value, error: error?.details[0]?.message.replace(/"/g, "'") };
 }
+
+export const rsvpSchema = Joi.object({
+  status: Joi.string().valid('going', 'maybe', 'declined').required(),
+  occurrence: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).allow(null),
+  note: Joi.string().trim().max(300).allow(''),
+});
+
+export const sharingSchema = Joi.object({ publicEnabled: Joi.boolean().required() });

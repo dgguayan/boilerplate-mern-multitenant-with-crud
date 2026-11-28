@@ -224,8 +224,9 @@ export function EventFormSheet() {
     [values?.startDate, values?.startTime, values?.allDay, values?.timeZone] // eslint-disable-line react-hooks/exhaustive-deps
   )
 
-  // Live resource-conflict check (warns; never blocks saving).
-  const conflictKey = values && values.resourceIds.length ? JSON.stringify([values.startDate, values.startTime, values.endDate, values.endTime, values.allDay, values.timeZone, values.resourceIds]) : ""
+  // Live availability of every resource for the chosen time. Overlaps on shareable resources are
+  // warnings; resources marked "prevent double booking" are refused by the server on save.
+  const conflictKey = values && resources.length ? JSON.stringify([values.startDate, values.startTime, values.endDate, values.endTime, values.allDay, values.timeZone, resources.length]) : ""
   useEffect(() => {
     if (!conflictKey || !values) {
       setConflicts([])
@@ -238,7 +239,7 @@ export function EventFormSheet() {
       const occ = form?.occurrence
       calendarApi
         .checkConflicts(
-          { start: start.toISOString(), end: end.toISOString(), resourceIds: values.resourceIds, excludeIds: [occ?.eventId, occ?.seriesId, occ?.id].filter(Boolean) },
+          { start: start.toISOString(), end: end.toISOString(), resourceIds: resources.slice(0, 100).map((r) => r._id), excludeIds: [occ?.eventId, occ?.seriesId, occ?.id].filter(Boolean) },
           controller.signal
         )
         .then((res) => setConflicts(res.data.data.conflicts))
@@ -250,6 +251,10 @@ export function EventFormSheet() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conflictKey])
+
+  const busyIds = new Set(conflicts.flatMap((c) => c.resourceIds))
+  const selectedConflicts = values ? conflicts.filter((c) => c.resourceIds.some((id) => values.resourceIds.includes(id))) : []
+  const blocking = values ? values.resourceIds.filter((id) => busyIds.has(id) && resourcesById.get(id)?.exclusive) : []
 
   const submit = async (event) => {
     event.preventDefault()
@@ -481,37 +486,71 @@ export function EventFormSheet() {
             <Section title="Resources">
               {resources.length ? (
                 <div role="group" aria-label="Book resources" className="grid gap-1.5 sm:grid-cols-2">
-                  {resources.map((r) => (
-                    <label key={r._id} className="flex items-center gap-2 rounded-lg border px-2.5 py-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={values.resourceIds.includes(r._id)}
-                        onChange={(e) =>
-                          set({ resourceIds: e.target.checked ? [...values.resourceIds, r._id] : values.resourceIds.filter((id) => id !== r._id) })
-                        }
-                      />
-                      <span className="truncate">{r.name}</span>
-                      <span className="ml-auto text-xs text-muted-foreground capitalize">{r.type}</span>
-                    </label>
-                  ))}
+                  {resources.map((r) => {
+                    const busy = busyIds.has(r._id)
+                    const state = !conflictKey ? null : busy ? (r.exclusive ? "Taken" : "Busy") : "Free"
+                    return (
+                      <label key={r._id} className="flex items-center gap-2 rounded-lg border px-2.5 py-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={values.resourceIds.includes(r._id)}
+                          onChange={(e) =>
+                            set({ resourceIds: e.target.checked ? [...values.resourceIds, r._id] : values.resourceIds.filter((id) => id !== r._id) })
+                          }
+                        />
+                        <span className="min-w-0 truncate">{r.name}</span>
+                        {state && (
+                          <span
+                            className={cn(
+                              "ml-auto shrink-0 rounded-full px-1.5 text-[0.7rem] font-medium",
+                              state === "Free" && "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+                              state === "Busy" && "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+                              state === "Taken" && "bg-red-500/10 text-red-700 dark:text-red-400"
+                            )}
+                            title={state === "Taken" ? "Booked, and can't be double-booked" : state === "Busy" ? "Booked, but can be shared" : "Free at this time"}
+                          >
+                            {state}
+                          </span>
+                        )}
+                        {!state && <span className="ml-auto text-xs text-muted-foreground capitalize">{r.type}</span>}
+                      </label>
+                    )
+                  })}
                 </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">No rooms or equipment have been set up yet.</p>
+              ) : null}
+              {resources.length > 0 && conflictKey && (
+                <p className="text-xs text-muted-foreground">
+                  At this time: <strong className="font-medium">Free</strong> · <strong className="font-medium">Busy</strong> (already booked, can be shared) ·{" "}
+                  <strong className="font-medium">Taken</strong> (already booked, can't be double-booked)
+                </p>
               )}
-              {conflicts.length > 0 && (
-                <div role="status" className="flex gap-2 rounded-lg border border-amber-600/30 bg-amber-500/10 p-3 text-sm">
-                  <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-400" aria-hidden="true" />
+              {resources.length === 0 && <p className="text-sm text-muted-foreground">No rooms or equipment have been set up yet.</p>}
+              {selectedConflicts.length > 0 && (
+                <div
+                  role={blocking.length ? "alert" : "status"}
+                  className={cn(
+                    "flex gap-2 rounded-lg border p-3 text-sm",
+                    blocking.length ? "border-destructive/30 bg-destructive/10" : "border-amber-600/30 bg-amber-500/10"
+                  )}
+                >
+                  <TriangleAlert className={cn("mt-0.5 size-4 shrink-0", blocking.length ? "text-destructive" : "text-amber-700 dark:text-amber-400")} aria-hidden="true" />
                   <div>
-                    <p className="font-medium">Scheduling conflict</p>
+                    <p className="font-medium">
+                      {blocking.length
+                        ? `${blocking.map((id) => resourcesById.get(id)?.name).join(", ")} can't be double-booked`
+                        : "Scheduling conflict"}
+                    </p>
                     <ul className="mt-1 space-y-0.5 text-xs">
-                      {conflicts.slice(0, 5).map((c) => (
+                      {selectedConflicts.slice(0, 5).map((c) => (
                         <li key={c.id}>
-                          {c.title} · {c.resourceIds.map((id) => resourcesById.get(id)?.name).filter(Boolean).join(", ")} ·{" "}
+                          {c.title} · {c.resourceIds.filter((id) => values.resourceIds.includes(id)).map((id) => resourcesById.get(id)?.name).filter(Boolean).join(", ")} ·{" "}
                           {fromJS(c.start, prefs.timeZone).toFormat(prefs.hour12 ? "LLL d, h:mm a" : "LLL d, HH:mm")}
                         </li>
                       ))}
                     </ul>
-                    <p className="mt-1 text-xs text-muted-foreground">You can still save; the overlap will be shown on the calendar.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {blocking.length ? "Pick another time, or untick it to save." : "You can still save; the overlap will be shown on the calendar."}
+                    </p>
                   </div>
                 </div>
               )}

@@ -20,8 +20,25 @@ import SettingsPage from "./pages/Settings.jsx"
 import ConfirmPassword from "./pages/ConfirmPassword.jsx"
 import SecurityGate from "./components/SecurityGate.jsx"
 
+// Public pages: no sign-in, loaded only when visited.
+const PublicCalendarPage = lazy(() => import("./pages/public/PublicCalendar.jsx"))
+const PublicEventPage = lazy(() => import("./pages/public/PublicEvent.jsx"))
+const EmbedWidgetPage = lazy(() => import("./pages/public/EmbedWidget.jsx"))
+
+/**
+ * The embed widget sits on other websites, so its colours come from its own ?theme= (auto follows
+ * the visitor's system), never from the theme this browser saved for the app.
+ */
+function embedTheme() {
+  if (!window.location.pathname.startsWith("/embed/")) return undefined
+  const theme = new URLSearchParams(window.location.search).get("theme")
+  if (theme === "light" || theme === "dark") return theme
+  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+}
+
 // The calendar (and FullCalendar) load only when the page is visited.
 const CalendarPage = lazy(() => import("./pages/Calendar.jsx"))
+const CalendarInsightsPage = lazy(() => import("./pages/CalendarInsights.jsx"))
 // Administration pages (administrators only)
 const UserManagementPage = lazy(() => import("./pages/UserManagement.jsx"))
 const RolesPermissionsPage = lazy(() => import("./pages/RolesPermissions.jsx"))
@@ -60,7 +77,7 @@ function AppLayout() {
 
 export default function App() {
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange forcedTheme={embedTheme()}>
       <TooltipProvider>
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <AuthProvider>
@@ -68,12 +85,16 @@ export default function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/forbidden" element={<Forbidden />} />
+              <Route path="/p/:tenant" element={<Suspense fallback={null}><PublicCalendarPage /></Suspense>} />
+              <Route path="/p/:tenant/events/:slug" element={<Suspense fallback={null}><PublicEventPage /></Suspense>} />
+              <Route path="/embed/:tenant" element={<Suspense fallback={null}><EmbedWidgetPage /></Suspense>} />
               <Route path="/confirm-password" element={<ProtectedRoute><ConfirmPassword /></ProtectedRoute>} />
               <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/projects" element={<Projects />} />
                 <Route path="/documents" element={<Documents />} />
                 <Route path="/calendar" element={<Suspense fallback={null}><CalendarPage /></Suspense>} />
+                <Route path="/calendar/insights" element={<ProtectedRoute requiredRole="manager"><Suspense fallback={null}><CalendarInsightsPage /></Suspense></ProtectedRoute>} />
                 {adminPages.map(([path, Page]) => (
                   <Route
                     key={path}

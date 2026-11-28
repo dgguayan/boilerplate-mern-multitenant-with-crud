@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "react-router-dom"
-import { Eye, EyeOff, LoaderCircle, RefreshCw, UserPlus } from "lucide-react"
+import { ChevronDown, Eye, EyeOff, LoaderCircle, Power, RefreshCw, UserCog, UserPlus } from "lucide-react"
 import { toast } from "sonner"
 
 import * as adminApi from "@/api/admin.api"
@@ -8,11 +8,14 @@ import { useAuth } from "@/hooks/useAuth"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
+import { fetchAllPages } from "@/lib/fetch-all-pages"
 import { PageHeader, ROLE_META, ROLE_ORDER, fieldClass } from "@/components/admin/shared"
 import { DataTable } from "@/components/data-table/data-table.jsx"
 import { MonthYearFilter, SelectFilter } from "@/components/data-table/filters.jsx"
 import { columnLabels, createColumns } from "@/components/users/columns.jsx"
+import { assignableRolesFor, labelLinkParams, userAccess } from "@/components/users/access.js"
 
 const EMPTY_FORM = { name: "", email: "", role: "user", password: "", isActive: true }
 
@@ -181,29 +184,31 @@ const STATUS_OPTIONS = [
   { value: "Active", label: "Active" },
   { value: "Inactive", label: "Inactive" },
 ]
-const STATUS_LABELS = { active: "Active", inactive: "Inactive" }
 const GROUP_OPTIONS = [
   { value: "role", label: "Group by role" },
   { value: "status", label: "Group by status" },
 ]
 
-/** Filters named in the URL, e.g. /members?role=admin from Roles & permissions. Unknown values are ignored. */
-function filtersFromUrl(searchParams) {
-  const role = ROLE_META[searchParams.get("role")]?.label
-  const status = STATUS_LABELS[searchParams.get("status")]
-  return [role && { id: "role", value: role }, status && { id: "status", value: status }].filter(Boolean)
+const INITIAL_STATE = {
+  columnPinning: { start: ["select", "name"] },
+  sorting: [{ id: "name", desc: false }],
 }
 
 /** Client-side table: load every user in the workspace (the API pages at 100), then filter locally. */
-async function fetchAllUsers(signal) {
-  const users = []
-  for (let page = 1, pages = 1; page <= pages; page++) {
+const fetchAllUsers = (signal) =>
+  fetchAllPages(async (page) => {
     const res = await adminApi.getUsers({ sort: "name", direction: "asc", page, limit: 100 }, signal)
-    users.push(...res.data.data.users)
-    pages = res.data.data.pagination.pages
-  }
-  return users
+    return { items: res.data.data.users, pages: res.data.data.pagination.pages }
+  })
+
+/** Runs one request per user; resolves to how many succeeded and the first error message. */
+async function forEachUser(users, request) {
+  const results = await Promise.allSettled(users.map(request))
+  const failed = results.filter((r) => r.status === "rejected")
+  return { ok: results.length - failed.length, failed: failed.length, error: failed[0] && adminApi.errorMessage(failed[0].reason) }
 }
+
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`
 
 export default function UserManagement() {
   const { user: me } = useAuth()
@@ -214,26 +219,16 @@ export default function UserManagement() {
   const [dialog, setDialog] = useState(null) // { mode, user }
   const [confirm, setConfirm] = useState(null)
 
-  const myRank = ROLE_META[me?.role]?.rank || 0
-  const assignableRoles = ROLE_ORDER.filter((r) => ROLE_META[r].rank <= myRank)
+  const assignableRoles = assignableRolesFor(me?.role, ROLE_ORDER)
 
-  // A link with ?role= / ?status= opens the table pre-filtered. The parameters are then removed so
-  // the address never disagrees with filters changed in the table; a new link remounts the table.
-  const [entry, setEntry] = useState(() => ({ id: 0, filters: filtersFromUrl(searchParams) }))
+  const [bulkConfirm, setBulkConfirm] = useState(null) // { users, clear }
+  const [bulkBusy, setBulkBusy] = useState(false)
+
+  // The table keeps its filters in the URL; rewrite role/status keys from links into its labels.
   useEffect(() => {
-    if (!searchParams.has("role") && !searchParams.has("status")) return
-    const filters = filtersFromUrl(searchParams)
-    setEntry((current) => ({ id: current.id + 1, filters }))
-    setSearchParams({}, { replace: true })
+    const next = labelLinkParams(searchParams)
+    if (next) setSearchParams(next, { replace: true })
   }, [searchParams, setSearchParams])
-  const initialState = useMemo(
-    () => ({
-      columnPinning: { start: ["select", "name"] },
-      sorting: [{ id: "name", desc: false }],
-      columnFilters: entry.filters,
-    }),
-    [entry]
-  )
 
   useEffect(() => {
     const controller = new AbortController()
@@ -249,8 +244,8 @@ export default function UserManagement() {
   const reload = useCallback(() => setVersion((v) => v + 1), [])
 
   const users = useMemo(
-    () => (data || []).map((u) => ({ ...u, isSelf: String(u._id) === String(me?.id), canManage: (ROLE_META[u.role]?.rank || 0) <= myRank })),
-    [data, me, myRank]
+    () => (data || []).map((u) => ({ ...u, ...userAccess(u, me) })),
+    [data, me]
   )
 
   const toggleActive = async (u) => {
@@ -263,6 +258,65 @@ export default function UserManagement() {
     } finally {
       setConfirm(null)
     }
+  }
+
+  // ── Bulk actions: only people this admin may manage, never themselves ──
+  const runBulk = async (targets, request, verb, clear) => {
+    setBulkBusy(true)
+    const { ok, failed, error: firstError } = await forEachUser(targets, request)
+    setBulkBusy(false)
+    if (ok) toast.success(`${plural(ok, "user")} ${verb}`)
+    if (failed) toast.error(`${plural(failed, "user")} could not be ${verb}${firstError ? `: ${firstError}` : ""}`)
+    clear()
+    reload()
+  }
+  const bulkActions = (selected, clear) => {
+    const manageable = selected.filter((u) => u.canManage && !u.isSelf)
+    const skipped = selected.length - manageable.length
+    const inactive = manageable.filter((u) => !u.isActive)
+    const active = manageable.filter((u) => u.isActive)
+    return (
+      <>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={bulkBusy || !inactive.length}
+          onClick={() => runBulk(inactive, (u) => adminApi.updateUser(u._id, { isActive: true }), "reactivated", clear)}
+        >
+          <Power className="size-4" />
+          Reactivate ({inactive.length})
+        </Button>
+        <Button variant="outline" size="sm" disabled={bulkBusy || !active.length} onClick={() => setBulkConfirm({ users: active, clear })}>
+          <Power className="size-4" />
+          Deactivate ({active.length})
+        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" disabled={bulkBusy || !manageable.length}>
+              <UserCog className="size-4" />
+              Change role
+              <ChevronDown className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuLabel>Set role for {plural(manageable.length, "user")}</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {assignableRoles.map((role) => (
+              <DropdownMenuItem
+                key={role}
+                onClick={() => {
+                  const targets = manageable.filter((u) => u.role !== role)
+                  runBulk(targets, (u) => adminApi.updateUser(u._id, { role }), `set to ${ROLE_META[role].label}`, clear)
+                }}
+              >
+                {ROLE_META[role].label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        {skipped > 0 && <span className="text-xs text-muted-foreground">{plural(skipped, "selected user")} you can't change (yourself or a higher role) will be skipped.</span>}
+      </>
+    )
   }
 
   const columns = useMemo(
@@ -296,7 +350,6 @@ export default function UserManagement() {
       ) : (
         data && (
           <DataTable
-            key={entry.id}
             data={users}
             columns={columns}
             columnLabels={columnLabels}
@@ -305,7 +358,10 @@ export default function UserManagement() {
             emptyMessage="No users match the current filters."
             exportFileName="users.csv"
             defaultManagedColumn="name"
-            initialState={initialState}
+            initialState={INITIAL_STATE}
+            storageKey="users"
+            syncUrl
+            bulkActions={bulkActions}
             rowClassName={(row) => !row.original.isActive && "text-muted-foreground"}
             filters={(table) => (
               <>
@@ -343,6 +399,33 @@ export default function UserManagement() {
             </Button>
             <Button variant={confirm?.isActive ? "destructive" : "default"} onClick={() => toggleActive(confirm)} autoFocus>
               {confirm?.isActive ? "Deactivate" : "Reactivate"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={Boolean(bulkConfirm)} onOpenChange={(open) => !open && !bulkBusy && setBulkConfirm(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Deactivate {plural(bulkConfirm?.users.length || 0, "user")}?</DialogTitle>
+            <DialogDescription>
+              They won't be able to sign in. Their current sessions end within 15 minutes. Their projects, events and history are kept.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkConfirm(null)} disabled={bulkBusy}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              autoFocus
+              disabled={bulkBusy}
+              onClick={async () => {
+                await runBulk(bulkConfirm.users, (u) => adminApi.updateUser(u._id, { isActive: false }), "deactivated", bulkConfirm.clear)
+                setBulkConfirm(null)
+              }}
+            >
+              {bulkBusy && <LoaderCircle className="animate-spin" data-icon="inline-start" />}
+              Deactivate
             </Button>
           </DialogFooter>
         </DialogContent>

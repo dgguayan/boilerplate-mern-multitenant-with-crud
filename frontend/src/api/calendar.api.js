@@ -15,6 +15,18 @@ export const duplicateEvent = (id) => api.post(`${base}/events/${id}/duplicate`)
 export const revertChanges = (changes) => api.post(`${base}/revert`, { changes });
 export const checkConflicts = (payload, signal) => api.post(`${base}/conflicts`, payload, { signal });
 
+// Replies. `occurrence` (yyyy-mm-dd) picks one occurrence of a recurring event.
+export const getRsvp = (id, occurrence) => api.get(`${base}/events/${id}/rsvp`, { params: { occurrence } });
+export const setRsvp = (id, { status, occurrence, note }) => api.put(`${base}/events/${id}/rsvp`, { status, occurrence, note });
+export const getAttendees = (id, occurrence) => api.get(`${base}/events/${id}/attendees`, { params: { occurrence } });
+
+// Insights for organizers: counts over [start, end) in the viewer's time zone.
+export const getAnalytics = ({ start, end, tz }) => api.get(`${base}/analytics`, { params: { start, end, tz }, timeout: 30000 });
+
+// Public calendar switch and the workspace's public address.
+export const getSharing = () => api.get(`${base}/sharing`);
+export const setSharing = (publicEnabled) => api.put(`${base}/sharing`, { publicEnabled });
+
 export const getCategories = () => api.get(`${base}/categories`);
 export const saveCategory = (id, data) => (id ? api.put(`${base}/categories/${id}`, data) : api.post(`${base}/categories`, data));
 export const deleteCategory = (id) => api.delete(`${base}/categories/${id}`);

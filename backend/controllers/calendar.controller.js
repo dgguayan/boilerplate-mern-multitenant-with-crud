@@ -1,4 +1,8 @@
 import * as calendar from '../services/calendar.service.js';
+import * as rsvp from '../services/rsvp.service.js';
+import * as notifications from '../services/notification.service.js';
+import * as sharing from '../services/public.service.js';
+import { getAnalytics } from '../services/analytics.service.js';
 import * as apiResponse from '../utils/apiResponse.js';
 import { audit } from '../utils/audit.js';
 import {
@@ -45,6 +49,9 @@ async function conflictsFor(user, event) {
 export const occurrences = handle(async (req, res) => {
   const { start, end } = validQuery(rangeQuerySchema, req.query);
   const result = await calendar.getOccurrences({ user: req.user, start, end });
+  // The viewer's own answer on each occurrence, for the "Going" marker and the "My RSVPs" filter.
+  const answers = await rsvp.myAnswers(req.user, result.occurrences);
+  for (const occ of result.occurrences) occ.myRsvp = answers.get(rsvp.answerKey(occ)) ?? null;
   return apiResponse.success(res, result);
 });
 
@@ -59,9 +66,38 @@ export const createEvent = handle(async (req, res) => {
   return apiResponse.created(res, { ...result, conflicts: await conflictsFor(req.user, result.event) }, 'Event created');
 });
 
+/**
+ * Where an edit's replies live and which occurrences it touched. A "this and following" split
+ * moves later replies onto the new series first, so nobody's answer is lost.
+ */
+async function repliesTouchedByEdit(req, result, scope, occurrenceKey) {
+  const ev = result.event;
+  if (ev.seriesId) return { rootId: ev.seriesId, keys: { key: ev.recurrenceKey } };
+  if (scope === 'following' && String(ev._id) !== req.params.id) {
+    await rsvp.moveAnswers(req.user.tenantId, req.params.id, ev._id, occurrenceKey);
+  }
+  return { rootId: ev._id, keys: { all: true } };
+}
+
 export const updateEvent = handle(async (req, res) => {
   const { scope, occurrenceKey, data } = req.body;
   const result = await calendar.updateEvent({ user: req.user, id: req.params.id, scope, occurrenceKey, data });
+  const { rootId, keys } = await repliesTouchedByEdit(req, result, scope, occurrenceKey);
+  const change = notifications.describeEdit(data, result.changes[0]?.before);
+  if (change) {
+    await notifications.quietly('event change', () =>
+      notifications.noticeEventChange({ tenantId: req.user.tenantId, event: result.event, rootId, scope: keys, change, actorId: req.user.userId })
+    );
+  }
+  // More places (or none) may let people off the waitlist.
+  if ('capacity' in data) {
+    const promoted = await rsvp.rebalanceEvent(req.user, rootId, keys);
+    if (promoted.length) {
+      await notifications.quietly('waitlist', () =>
+        notifications.noticePromoted({ tenantId: req.user.tenantId, event: result.event, rootId, promoted })
+      );
+    }
+  }
   logCalendar(req, 'event_updated', `Updated event “${result.event.title}”${SCOPE_TEXT[scope] || ''}`, eventTarget(result.event), {
     scope,
     occurrence: occurrenceKey,
@@ -73,7 +109,28 @@ export const updateEvent = handle(async (req, res) => {
 export const deleteEvent = handle(async (req, res) => {
   const scope = ['this', 'following', 'all'].includes(req.query.scope) ? req.query.scope : 'all';
   const occurrenceKey = /^\d{4}-\d{2}-\d{2}$/.test(req.query.occurrence || '') ? req.query.occurrence : undefined;
+  const before = await calendar.peekEvent(req.user, req.params.id);
   const result = await calendar.deleteEvent({ user: req.user, id: req.params.id, scope, occurrenceKey });
+  if (before) {
+    // An edited occurrence answers for its own date; a series for the dates the scope covers.
+    const touched = before.seriesId
+      ? { rootId: before.seriesId, keys: { key: before.recurrenceKey } }
+      : before.recurrence?.freq && scope === 'this' && occurrenceKey
+            ? { rootId: before._id, keys: { key: occurrenceKey } }
+            : before.recurrence?.freq && scope === 'following' && occurrenceKey
+              ? { rootId: before._id, keys: { from: occurrenceKey } }
+              : { rootId: before._id, keys: { all: true } };
+    await notifications.quietly('event deleted', () =>
+      notifications.noticeEventChange({
+        tenantId: req.user.tenantId,
+        event: before,
+        rootId: touched.rootId,
+        scope: touched.keys,
+        change: { type: 'event_deleted' },
+        actorId: req.user.userId,
+      })
+    );
+  }
   const title = result.changes[0]?.before?.title || 'event';
   logCalendar(req, 'event_deleted', `Deleted event “${title}”${SCOPE_TEXT[scope] || ''}`, { type: 'event', id: req.params.id, label: title }, { scope, occurrence: occurrenceKey });
   return apiResponse.success(res, result, 'Event deleted');
@@ -82,7 +139,12 @@ export const deleteEvent = handle(async (req, res) => {
 export const duplicateEvent = handle(async (req, res) => {
   const result = await calendar.duplicateEvent({ user: req.user, id: req.params.id });
   logCalendar(req, 'event_duplicated', `Duplicated an event as “${result.event.title}”`, eventTarget(result.event));
-  return apiResponse.created(res, result, 'Event duplicated');
+  const dropped = result.droppedResources.length;
+  return apiResponse.created(
+    res,
+    result,
+    dropped ? `Event duplicated. ${dropped === 1 ? 'A room that can’t be double-booked was' : `${dropped} rooms that can’t be double-booked were`} left off the copy.` : 'Event duplicated'
+  );
 });
 
 export const revert = handle(async (req, res) => {
@@ -179,4 +241,62 @@ export const deleteResource = handle(async (req, res) => {
   await calendar.deleteResource({ user: req.user, id: req.params.id });
   logCalendar(req, 'resource_deleted', 'Deleted a resource', { type: 'resource', id: req.params.id });
   return apiResponse.success(res, {}, 'Resource deleted');
+});
+
+/* ── RSVP ─────────────────────────────────────────────── */
+
+const occurrenceParam = (value) => (/^\d{4}-\d{2}-\d{2}$/.test(value || '') ? value : undefined);
+const RSVP_WORDS = { going: 'is going to', maybe: 'might go to', declined: "can't go to", waitlist: 'joined the waitlist for' };
+
+export const getRsvp = handle(async (req, res) => {
+  const summary = await rsvp.getRsvpSummary({ user: req.user, id: req.params.id, occurrenceKey: occurrenceParam(req.query.occurrence) });
+  return apiResponse.success(res, summary);
+});
+
+export const setRsvp = handle(async (req, res) => {
+  const { status, note, occurrence } = req.body;
+  const result = await rsvp.setRsvp({ user: req.user, id: req.params.id, occurrenceKey: occurrence, status, note });
+  const stored = result.summary.mine?.status;
+  logCalendar(req, 'rsvp', `Replied: ${RSVP_WORDS[stored] || stored} “${result.target.event.title}”`, eventTarget(result.target.event), {
+    status: stored,
+    occurrence: result.target.key,
+    previous: result.previous,
+    promoted: result.promoted.length || undefined,
+  });
+  if (result.promoted.length) {
+    await notifications.quietly('waitlist', () =>
+      notifications.noticePromoted({
+        tenantId: req.user.tenantId,
+        event: result.target.event,
+        rootId: result.target.rootId,
+        promoted: result.promoted.map((userId) => ({ userId, key: result.target.key })),
+      })
+    );
+  }
+  return apiResponse.success(res, result.summary, stored === 'waitlist' ? 'The event is full — you are on the waitlist' : 'Reply saved');
+});
+
+export const listAttendees = handle(async (req, res) => {
+  const result = await rsvp.listAttendees({ user: req.user, id: req.params.id, occurrenceKey: occurrenceParam(req.query.occurrence) });
+  return apiResponse.success(res, result);
+});
+
+/* ── Public calendar sharing ──────────────────────────── */
+
+export const getSharing = handle(async (req, res) => apiResponse.success(res, await sharing.getSharing(req.user)));
+
+export const setSharing = handle(async (req, res) => {
+  const result = await sharing.setSharing(req.user, req.body);
+  logCalendar(req, 'sharing_changed', result.publicEnabled ? 'Turned the public calendar on' : 'Turned the public calendar off', null, {
+    publicEnabled: result.publicEnabled,
+  });
+  return apiResponse.success(res, result, result.publicEnabled ? 'The public calendar is on' : 'The public calendar is off');
+});
+
+/* ── Insights ─────────────────────────────────────────── */
+
+export const analytics = handle(async (req, res) => {
+  const { start, end } = validQuery(rangeQuerySchema, req.query);
+  const zone = typeof req.query.tz === 'string' && req.query.tz.length < 64 ? req.query.tz : 'UTC';
+  return apiResponse.success(res, await getAnalytics({ user: req.user, start, end, zone }));
 });

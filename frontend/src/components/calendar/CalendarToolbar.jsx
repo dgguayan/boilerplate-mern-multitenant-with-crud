@@ -1,7 +1,9 @@
 import { useState } from "react"
 import { DateTime, Info } from "luxon"
+import { Link } from "react-router-dom"
 import {
   CalendarSearch,
+  ChartColumn,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -17,6 +19,7 @@ import {
   Search,
   Settings2,
   Shapes,
+  Share2,
   Undo2,
   Warehouse,
 } from "lucide-react"
@@ -227,6 +230,18 @@ export function CalendarToolbar({
               <FileDown />
               Import and export
             </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => onOpenDialog("share")}>
+              <Share2 />
+              Share and embed
+            </DropdownMenuItem>
+            {permissions.canCreate && (
+              <DropdownMenuItem asChild>
+                <Link to="/calendar/insights">
+                  <ChartColumn />
+                  Insights
+                </Link>
+              </DropdownMenuItem>
+            )}
             {permissions.isAdmin && (
               <>
                 <DropdownMenuItem onSelect={() => onOpenDialog("categories")}>

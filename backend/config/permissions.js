@@ -53,7 +53,11 @@ export const PERMISSIONS = [
       { key: 'calendar.create', label: 'Create and import events', access: { ...all, user: 'none' } },
       { key: 'calendar.edit', label: 'Edit, reschedule and delete events', access: { superadmin: 'all', admin: 'all', manager: 'own', user: 'none' } },
       { key: 'calendar.export', label: 'Export events', access: all },
+      { key: 'calendar.rsvp', label: 'Reply to events (going, maybe, can’t go)', access: all, note: 'Only to events they can see, before the event starts and its registration deadline.' },
+      { key: 'calendar.attendees', label: 'See who replied to an event', access: { superadmin: 'all', admin: 'all', manager: 'own', user: 'none' } },
       { key: 'calendar.manage', label: 'Manage categories and resources', access: adminsOnly },
+      { key: 'calendar.insights', label: 'See calendar insights (attendance, busiest times, room use)', access: { ...all, user: 'none' }, note: 'Counts only events the person can see.' },
+      { key: 'calendar.share', label: 'Turn the public calendar on or off', access: adminsOnly, note: 'Public pages show only events marked public, in a public category or none.' },
     ],
   },
   {

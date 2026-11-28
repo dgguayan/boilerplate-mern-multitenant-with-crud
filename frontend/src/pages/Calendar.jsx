@@ -16,6 +16,7 @@ import { ActiveFilters, CalendarSidebar } from "@/components/calendar/CalendarSi
 import { EventDetailsSheet } from "@/components/calendar/EventDetailsSheet"
 import { EventFormSheet } from "@/components/calendar/EventFormSheet"
 import { CategoryManager, ImportExportDialog, ResourceManager, SettingsDialog } from "@/components/calendar/ManageDialogs"
+import { ShareDialog } from "@/components/calendar/ShareDialog"
 import { EventListView, UpcomingView } from "@/components/calendar/views/ListViews"
 import YearView from "@/components/calendar/views/YearView"
 import LaneView from "@/components/calendar/views/LaneView"
@@ -176,13 +177,14 @@ export default function CalendarPage() {
         chipCount={chipCount}
         range={range}
         eventParam={searchParams.get("event")}
-        clearEventParam={() => updateParams({ event: null })}
+        occurrenceParam={searchParams.get("occurrence")}
+        clearEventParam={() => updateParams({ event: null, occurrence: null })}
       />
     </CalendarProvider>
   )
 }
 
-function CalendarScreen({ view, setView, date, setDate, data, filtered, filters, setFilters, query, setQuery, sort, setSort, eventFacets, chipCount, range, eventParam, clearEventParam }) {
+function CalendarScreen({ view, setView, date, setDate, data, filtered, filters, setFilters, query, setQuery, sort, setSort, eventFacets, chipCount, range, eventParam, occurrenceParam, clearEventParam }) {
   const ctx = useCalendar()
   const { prefs, permissions, openCreate, openDetails, undo, details, form } = ctx
   const [sidebarOpen, setSidebarOpen] = useState(() => {
@@ -214,10 +216,14 @@ function CalendarScreen({ view, setView, date, setDate, data, filtered, filters,
     setQuery("")
   }
 
-  // Deep link: /calendar?event=<id> opens that event's details.
+  // Deep link: /calendar?event=<id> opens that event's details; &occurrence=<yyyy-mm-dd> picks one
+  // occurrence of a recurring event (notifications link to the date they are about).
   useEffect(() => {
     if (!eventParam || data.status !== "ready") return
-    const found = data.occurrences.find((o) => o.eventId === eventParam || o.seriesId === eventParam)
+    const matches = (o) => o.eventId === eventParam || o.seriesId === eventParam
+    const found =
+      (occurrenceParam && data.occurrences.find((o) => matches(o) && o.recurrenceKey === occurrenceParam)) ||
+      data.occurrences.find(matches)
     if (found) {
       openDetails(found)
       clearEventParam()
@@ -370,6 +376,7 @@ function CalendarScreen({ view, setView, date, setDate, data, filtered, filters,
       <ResourceManager open={dialog === "resources"} onOpenChange={(o) => !o && setDialog(null)} />
       <ImportExportDialog open={dialog === "importExport"} onOpenChange={(o) => !o && setDialog(null)} defaultRange={range} />
       <SettingsDialog open={dialog === "settings"} onOpenChange={(o) => !o && setDialog(null)} />
+      <ShareDialog open={dialog === "share"} onOpenChange={(o) => !o && setDialog(null)} />
       <Dialog open={dialog === "shortcuts"} onOpenChange={(o) => !o && setDialog(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>

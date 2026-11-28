@@ -21,7 +21,7 @@ const INITIAL_STATE = {
   sorting: [{ id: 'createdAt', desc: true }],
 };
 
-export function ProjectsDataTable({ data, onEdit, onDelete, canEdit, canDelete }) {
+export function ProjectsDataTable({ data, onEdit, onDelete, canEdit, canDelete, bulkActions }) {
   const columns = useMemo(
     () => createColumns({ onEdit, onDelete, canEdit, canDelete }),
     [onEdit, onDelete, canEdit, canDelete],
@@ -38,6 +38,9 @@ export function ProjectsDataTable({ data, onEdit, onDelete, canEdit, canDelete }
       exportFileName="projects.csv"
       defaultManagedColumn="code"
       initialState={INITIAL_STATE}
+      storageKey="projects"
+      syncUrl
+      bulkActions={bulkActions}
       filters={(table) => (
         <>
           <MonthYearFilter table={table} columnId="createdAt" />

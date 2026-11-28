@@ -12,6 +12,8 @@ import {
   createEventSchema,
   resourceSchema,
   revertSchema,
+  rsvpSchema,
+  sharingSchema,
   updateEventSchema,
 } from '../validators/calendar.validators.js';
 
@@ -46,6 +48,10 @@ router.post('/events/:id/duplicate', requireRole(...EDITORS), controller.duplica
 router.post('/revert', requireRole(...EDITORS), validate(revertSchema), controller.revert);
 router.post('/conflicts', validate(conflictsSchema), controller.conflicts);
 
+router.get('/events/:id/rsvp', controller.getRsvp);
+router.put('/events/:id/rsvp', validate(rsvpSchema), controller.setRsvp);
+router.get('/events/:id/attendees', controller.listAttendees);
+
 router.get('/export', controller.exportCalendar);
 router.post(
   '/import',
@@ -54,6 +60,10 @@ router.post(
   express.text({ type: ['text/*', 'application/octet-stream'], limit: '2mb' }),
   controller.importCalendar
 );
+
+router.get('/analytics', requireRole(...EDITORS), controller.analytics);
+router.get('/sharing', controller.getSharing);
+router.put('/sharing', requireRole(...ADMINS), validate(sharingSchema), controller.setSharing);
 
 router.get('/categories', controller.listCategories);
 router.post('/categories', requireRole(...ADMINS), validate(categorySchema), controller.saveCategory);

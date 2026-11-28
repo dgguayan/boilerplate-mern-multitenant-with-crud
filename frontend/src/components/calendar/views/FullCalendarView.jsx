@@ -7,7 +7,7 @@ import listPlugin from "@fullcalendar/list"
 import multiMonthPlugin from "@fullcalendar/multimonth"
 import interactionPlugin from "@fullcalendar/interaction"
 import luxonPlugin from "@fullcalendar/luxon3"
-import { Repeat } from "lucide-react"
+import { Check, Hourglass, Repeat } from "lucide-react"
 
 import { useCalendar } from "../CalendarContext"
 import { EventPreview } from "../EventPreview"
@@ -210,6 +210,14 @@ function EventContent({ arg, categoriesById }) {
   const status = o.status !== "published" ? STATUS_META[o.status] : null
   const isList = arg.view.type.startsWith("list")
   const isTimeGrid = arg.view.type.startsWith("timeGrid") && !arg.event.allDay
+  // The viewer's own place: a check when going, an hourglass on the waitlist.
+  const RsvpIcon = o.myRsvp === "going" ? Check : o.myRsvp === "waitlist" ? Hourglass : null
+  const rsvpMark = RsvpIcon && (
+    <span className="shrink-0" title={o.myRsvp === "going" ? "You're going" : "You're on the waitlist"}>
+      <RsvpIcon className="size-3" aria-hidden="true" />
+      <span className="sr-only">{o.myRsvp === "going" ? "You're going" : "You're on the waitlist"}</span>
+    </span>
+  )
   const icon = (
     <span className="shrink-0" style={{ color: arg.borderColor }}>
       <CategoryIcon category={category} className="size-3" />
@@ -223,6 +231,7 @@ function EventContent({ arg, categoriesById }) {
         <div className="flex min-w-0 items-center gap-1">
           {icon}
           <span className="cal-title min-w-0 flex-1 truncate font-medium">{arg.event.title}</span>
+          {rsvpMark}
           {o.isRecurring && <Repeat className="size-3 shrink-0 opacity-60" aria-hidden="true" />}
         </div>
         {arg.timeText && <span className="truncate text-[0.7rem] tabular-nums opacity-80">{arg.timeText}</span>}
@@ -244,6 +253,7 @@ function EventContent({ arg, categoriesById }) {
         <span className="hidden shrink-0 text-[0.7rem] tabular-nums opacity-75 sm:inline">{arg.timeText}</span>
       )}
       <span className="cal-title min-w-0 flex-1 truncate font-medium">{arg.event.title}</span>
+      {rsvpMark}
       {status &&
         (isList ? (
           <span className="inline-flex shrink-0 items-center gap-0.5 text-[0.65rem] font-semibold tracking-wide uppercase opacity-80">
