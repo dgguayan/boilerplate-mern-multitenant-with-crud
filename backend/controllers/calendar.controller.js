@@ -2,6 +2,7 @@ import * as calendar from '../services/calendar.service.js';
 import * as rsvp from '../services/rsvp.service.js';
 import * as notifications from '../services/notification.service.js';
 import * as sharing from '../services/public.service.js';
+import { getAnalytics } from '../services/analytics.service.js';
 import * as apiResponse from '../utils/apiResponse.js';
 import { audit } from '../utils/audit.js';
 import {
@@ -290,4 +291,12 @@ export const setSharing = handle(async (req, res) => {
     publicEnabled: result.publicEnabled,
   });
   return apiResponse.success(res, result, result.publicEnabled ? 'The public calendar is on' : 'The public calendar is off');
+});
+
+/* ── Insights ─────────────────────────────────────────── */
+
+export const analytics = handle(async (req, res) => {
+  const { start, end } = validQuery(rangeQuerySchema, req.query);
+  const zone = typeof req.query.tz === 'string' && req.query.tz.length < 64 ? req.query.tz : 'UTC';
+  return apiResponse.success(res, await getAnalytics({ user: req.user, start, end, zone }));
 });

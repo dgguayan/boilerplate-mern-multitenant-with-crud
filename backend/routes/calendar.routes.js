@@ -61,6 +61,7 @@ router.post(
   controller.importCalendar
 );
 
+router.get('/analytics', requireRole(...EDITORS), controller.analytics);
 router.get('/sharing', controller.getSharing);
 router.put('/sharing', requireRole(...ADMINS), validate(sharingSchema), controller.setSharing);
 

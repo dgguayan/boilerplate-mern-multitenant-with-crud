@@ -38,6 +38,7 @@ function embedTheme() {
 
 // The calendar (and FullCalendar) load only when the page is visited.
 const CalendarPage = lazy(() => import("./pages/Calendar.jsx"))
+const CalendarInsightsPage = lazy(() => import("./pages/CalendarInsights.jsx"))
 // Administration pages (administrators only)
 const UserManagementPage = lazy(() => import("./pages/UserManagement.jsx"))
 const RolesPermissionsPage = lazy(() => import("./pages/RolesPermissions.jsx"))
@@ -93,6 +94,7 @@ export default function App() {
                 <Route path="/projects" element={<Projects />} />
                 <Route path="/documents" element={<Documents />} />
                 <Route path="/calendar" element={<Suspense fallback={null}><CalendarPage /></Suspense>} />
+                <Route path="/calendar/insights" element={<ProtectedRoute requiredRole="manager"><Suspense fallback={null}><CalendarInsightsPage /></Suspense></ProtectedRoute>} />
                 {adminPages.map(([path, Page]) => (
                   <Route
                     key={path}

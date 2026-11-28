@@ -36,6 +36,7 @@ export function SiteHeader() {
     "/projects": "Projects",
     "/documents": "Documents",
     "/calendar": "Calendar",
+    "/calendar/insights": "Calendar insights",
     "/reports": "Reports",
     "/teams": "Teams",
     "/clients": "Clients",

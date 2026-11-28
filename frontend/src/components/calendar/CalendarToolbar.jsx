@@ -1,7 +1,9 @@
 import { useState } from "react"
 import { DateTime, Info } from "luxon"
+import { Link } from "react-router-dom"
 import {
   CalendarSearch,
+  ChartColumn,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -232,6 +234,14 @@ export function CalendarToolbar({
               <Share2 />
               Share and embed
             </DropdownMenuItem>
+            {permissions.canCreate && (
+              <DropdownMenuItem asChild>
+                <Link to="/calendar/insights">
+                  <ChartColumn />
+                  Insights
+                </Link>
+              </DropdownMenuItem>
+            )}
             {permissions.isAdmin && (
               <>
                 <DropdownMenuItem onSelect={() => onOpenDialog("categories")}>
