@@ -1,6 +1,7 @@
 import * as calendar from '../services/calendar.service.js';
 import * as rsvp from '../services/rsvp.service.js';
 import * as notifications from '../services/notification.service.js';
+import * as sharing from '../services/public.service.js';
 import * as apiResponse from '../utils/apiResponse.js';
 import { audit } from '../utils/audit.js';
 import {
@@ -272,4 +273,16 @@ export const setRsvp = handle(async (req, res) => {
 export const listAttendees = handle(async (req, res) => {
   const result = await rsvp.listAttendees({ user: req.user, id: req.params.id, occurrenceKey: occurrenceParam(req.query.occurrence) });
   return apiResponse.success(res, result);
+});
+
+/* ── Public calendar sharing ──────────────────────────── */
+
+export const getSharing = handle(async (req, res) => apiResponse.success(res, await sharing.getSharing(req.user)));
+
+export const setSharing = handle(async (req, res) => {
+  const result = await sharing.setSharing(req.user, req.body);
+  logCalendar(req, 'sharing_changed', result.publicEnabled ? 'Turned the public calendar on' : 'Turned the public calendar off', null, {
+    publicEnabled: result.publicEnabled,
+  });
+  return apiResponse.success(res, result, result.publicEnabled ? 'The public calendar is on' : 'The public calendar is off');
 });

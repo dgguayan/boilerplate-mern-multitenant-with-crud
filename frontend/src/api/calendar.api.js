@@ -20,6 +20,10 @@ export const getRsvp = (id, occurrence) => api.get(`${base}/events/${id}/rsvp`, 
 export const setRsvp = (id, { status, occurrence, note }) => api.put(`${base}/events/${id}/rsvp`, { status, occurrence, note });
 export const getAttendees = (id, occurrence) => api.get(`${base}/events/${id}/attendees`, { params: { occurrence } });
 
+// Public calendar switch and the workspace's public address.
+export const getSharing = () => api.get(`${base}/sharing`);
+export const setSharing = (publicEnabled) => api.put(`${base}/sharing`, { publicEnabled });
+
 export const getCategories = () => api.get(`${base}/categories`);
 export const saveCategory = (id, data) => (id ? api.put(`${base}/categories/${id}`, data) : api.post(`${base}/categories`, data));
 export const deleteCategory = (id) => api.delete(`${base}/categories/${id}`);

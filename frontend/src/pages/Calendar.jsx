@@ -16,6 +16,7 @@ import { ActiveFilters, CalendarSidebar } from "@/components/calendar/CalendarSi
 import { EventDetailsSheet } from "@/components/calendar/EventDetailsSheet"
 import { EventFormSheet } from "@/components/calendar/EventFormSheet"
 import { CategoryManager, ImportExportDialog, ResourceManager, SettingsDialog } from "@/components/calendar/ManageDialogs"
+import { ShareDialog } from "@/components/calendar/ShareDialog"
 import { EventListView, UpcomingView } from "@/components/calendar/views/ListViews"
 import YearView from "@/components/calendar/views/YearView"
 import LaneView from "@/components/calendar/views/LaneView"
@@ -375,6 +376,7 @@ function CalendarScreen({ view, setView, date, setDate, data, filtered, filters,
       <ResourceManager open={dialog === "resources"} onOpenChange={(o) => !o && setDialog(null)} />
       <ImportExportDialog open={dialog === "importExport"} onOpenChange={(o) => !o && setDialog(null)} defaultRange={range} />
       <SettingsDialog open={dialog === "settings"} onOpenChange={(o) => !o && setDialog(null)} />
+      <ShareDialog open={dialog === "share"} onOpenChange={(o) => !o && setDialog(null)} />
       <Dialog open={dialog === "shortcuts"} onOpenChange={(o) => !o && setDialog(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>

@@ -13,6 +13,7 @@ import {
   resourceSchema,
   revertSchema,
   rsvpSchema,
+  sharingSchema,
   updateEventSchema,
 } from '../validators/calendar.validators.js';
 
@@ -59,6 +60,9 @@ router.post(
   express.text({ type: ['text/*', 'application/octet-stream'], limit: '2mb' }),
   controller.importCalendar
 );
+
+router.get('/sharing', controller.getSharing);
+router.put('/sharing', requireRole(...ADMINS), validate(sharingSchema), controller.setSharing);
 
 router.get('/categories', controller.listCategories);
 router.post('/categories', requireRole(...ADMINS), validate(categorySchema), controller.saveCategory);

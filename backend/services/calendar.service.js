@@ -196,7 +196,7 @@ function toOccurrence(event, occurrence, user, isSeries) {
 }
 
 /** Expands every visible event into occurrences in [start, end). */
-async function expandRange({ filter, start, end, user }) {
+export async function expandRange({ filter, start, end, user }) {
   const [singles, series] = await Promise.all([
     CalendarEvent.find({ ...filter, recurrence: null, start: { $lt: end }, end: { $gt: start } })
       .select(LIST_FIELDS)

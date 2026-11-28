@@ -14,6 +14,7 @@
  *    capacity, registration deadline, free and paid prices, attachments, custom fields, tags,
  *    an imported event (externalUid) and view counts for the "Most viewed" sort
  *  - Resources of every type, a double-booked room (conflict) and a crowded day ("+N more")
+ *  - The public calendar turned on, so /p/acme and the embed widget have events to show
  *
  * Users and projects are not touched.
  */
@@ -146,6 +147,13 @@ async function main() {
       ...timedFrom(lastFridayAnchor.set({ hour: 16 }), 90),
       recurrence: { freq: 'monthly', interval: 1, monthlyMode: 'nthWeekday', end: { type: 'never' } },
       tags: ['company', 'demo'],
+    },
+    {
+      title: 'Community office hours', summary: 'Drop in with questions — open to everyone', categoryId: cat.Webinars,
+      ...timed(monday(0) + 2, 17, 60),
+      recurrence: { freq: 'weekly', interval: 1, byWeekday: [3], end: { type: 'count', count: 10 } },
+      virtualUrl: 'https://meet.google.com/xyz-office-hrs', visibility: 'public', capacity: 50,
+      organizer: { name: 'Priya Shah', email: 'priya@acme.example' }, tags: ['community'], viewCount: 23,
     },
     {
       title: 'Payroll run', categoryId: cat.Deadlines, color: '#16a34a',
@@ -284,9 +292,14 @@ async function main() {
     recurrenceKey: movedStandUp.toISODate(),
   });
 
+  // Show the public pages, widget and subscribe feed with the sample data (admins can turn it off).
+  await Tenant.updateOne({ _id: tenant._id }, { 'publicCalendar.enabled': true, 'publicCalendar.enabledAt': new Date() });
+
   console.log(
     `Seeded ${categoryList.length} categories, ${resourceList.length} resources and ${events.length + 1} events ` +
-      `(${events.filter((e) => e.recurrence).length} series, 1 edited occurrence) for ${tenant.name}.`
+      `(${events.filter((e) => e.recurrence).length} series, 1 edited occurrence) for ${tenant.name}.
+` +
+      `Public calendar: /p/${tenant.slug} (on)`
   );
   await mongoose.disconnect();
 }

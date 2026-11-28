@@ -10,6 +10,12 @@ const tenantSchema = new mongoose.Schema(
       maxUsers: { type: Number, default: 5 },
       maxProjects: { type: Number, default: 10 },
     },
+    // Public event pages, the embeddable widget and the subscribe feed. Off until an admin turns it on;
+    // even then only events marked "public" (in a public or no category) are shown.
+    publicCalendar: {
+      enabled: { type: Boolean, default: false },
+      enabledAt: { type: Date },
+    },
   },
   { timestamps: true }
 );

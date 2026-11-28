@@ -17,6 +17,7 @@ import {
   Search,
   Settings2,
   Shapes,
+  Share2,
   Undo2,
   Warehouse,
 } from "lucide-react"
@@ -226,6 +227,10 @@ export function CalendarToolbar({
             <DropdownMenuItem onSelect={() => onOpenDialog("importExport")}>
               <FileDown />
               Import and export
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => onOpenDialog("share")}>
+              <Share2 />
+              Share and embed
             </DropdownMenuItem>
             {permissions.isAdmin && (
               <>
