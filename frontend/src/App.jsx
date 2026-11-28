@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react"
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom"
 import { ThemeProvider } from "next-themes"
 
@@ -7,25 +8,35 @@ import { SiteHeader } from "./components/site-header.jsx"
 import ProtectedRoute from "./components/ProtectedRoute.jsx"
 import { SidebarInset, SidebarProvider } from "./components/ui/sidebar.jsx"
 import { TooltipProvider } from "./components/ui/tooltip.jsx"
+import { Toaster } from "./components/ui/sonner.jsx"
 import Login from "./pages/Login.jsx"
 import Register from "./pages/Register.jsx"
 import Dashboard from "./pages/Dashboard.jsx"
 import Projects from "./pages/Projects.jsx"
+import Documents from "./pages/Documents.jsx"
 import Forbidden from "./pages/Forbidden.jsx"
 import TemporaryPage from "./pages/TemporaryPage.jsx"
 import SettingsPage from "./pages/Settings.jsx"
 import ConfirmPassword from "./pages/ConfirmPassword.jsx"
 import SecurityGate from "./components/SecurityGate.jsx"
 
+// The calendar (and FullCalendar) load only when the page is visited.
+const CalendarPage = lazy(() => import("./pages/Calendar.jsx"))
+// Administration pages (administrators only)
+const UserManagementPage = lazy(() => import("./pages/UserManagement.jsx"))
+const RolesPermissionsPage = lazy(() => import("./pages/RolesPermissions.jsx"))
+const LogsPage = lazy(() => import("./pages/Logs.jsx"))
+
+const adminPages = [
+  ["members", UserManagementPage],
+  ["access-control", RolesPermissionsPage],
+  ["audit-trail", LogsPage],
+]
+
 const temporaryPages = [
-  ["documents", "Documents"],
-  ["calendar", "Calendar"],
   ["reports", "Reports"],
   ["teams", "Teams"],
   ["clients", "Clients"],
-  ["members", "Members"],
-  ["access-control", "Access Control"],
-  ["audit-trail", "Audit Trail"],
   ["resources", "Resources"],
   ["help", "Help Center"],
 ]
@@ -61,8 +72,17 @@ export default function App() {
               <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/projects" element={<Projects />} />
-                {temporaryPages.map(([path, title]) => (
-                  <Route key={path} path={`/${path}`} element={<TemporaryPage title={title} />} />
+                <Route path="/documents" element={<Documents />} />
+                <Route path="/calendar" element={<Suspense fallback={null}><CalendarPage /></Suspense>} />
+                {adminPages.map(([path, Page]) => (
+                  <Route
+                    key={path}
+                    path={`/${path}`}
+                    element={<ProtectedRoute requiredRole="admin"><Suspense fallback={null}><Page /></Suspense></ProtectedRoute>}
+                  />
+                ))}
+                {temporaryPages.map(([path, title, description]) => (
+                  <Route key={path} path={`/${path}`} element={<TemporaryPage title={title} description={description} />} />
                 ))}
                 <Route path="/settings/profile" element={<SettingsPage />} />
                 <Route path="/settings/security" element={<SecurityGate><SettingsPage /></SecurityGate>} />
@@ -73,6 +93,7 @@ export default function App() {
             </Routes>
           </AuthProvider>
         </BrowserRouter>
+        <Toaster position="bottom-right" richColors closeButton />
       </TooltipProvider>
     </ThemeProvider>
   )

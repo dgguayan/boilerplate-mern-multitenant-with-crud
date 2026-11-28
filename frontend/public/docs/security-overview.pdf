@@ -1,0 +1,164 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [6 0 R 8 0 R 10 0 R 12 0 R] /Count 4 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Length 901 >>
+stream
+0.11 0.11 0.13 rg
+0 736 612 56 re f
+BT /F2 11 Tf 1 1 1 rg
+64 758 Td (Platform Security Overview) Tj ET
+BT /F2 22 Tf 0.1 0.1 0.12 rg
+64 682 Td (Overview) Tj ET
+BT /F1 11 Tf 0.25 0.25 0.28 rg
+64 646 Td (This document summarises the security controls that protect tenant data on the) Tj ET
+BT /F1 11 Tf 0.25 0.25 0.28 rg
+64 630 Td (platform, including authentication, isolation and monitoring.) Tj ET
+BT /F1 11 Tf 0.25 0.25 0.28 rg
+64 604 Td (Each tenant keeps its own projects, members and settings. Administrators can invite) Tj ET
+BT /F1 11 Tf 0.25 0.25 0.28 rg
+64 588 Td (people, assign roles and review the audit trail at any time from the workspace) Tj ET
+BT /F1 11 Tf 0.25 0.25 0.28 rg
+64 572 Td (settings.) Tj ET
+0.85 0.85 0.87 RG 0.5 w
+64 52 m 548 52 l S
+BT /F1 9 Tf 0.45 0.45 0.5 rg
+64 36 Td (Sample document for preview testing) Tj ET
+BT /F1 9 Tf 0.45 0.45 0.5 rg
+488 36 Td (Page 1 of 4) Tj ET
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 5 0 R >>
+endobj
+7 0 obj
+<< /Length 937 >>
+stream
+0.11 0.11 0.13 rg
+0 736 612 56 re f
+BT /F2 11 Tf 1 1 1 rg
+64 758 Td (Platform Security Overview) Tj ET
+BT /F2 22 Tf 0.1 0.1 0.12 rg
+64 682 Td (Authentication) Tj ET
+BT /F1 11 Tf 0.25 0.25 0.28 rg
+64 646 Td (Users sign in with a password and an optional second factor. Sessions use short-lived) Tj ET
+BT /F1 11 Tf 0.25 0.25 0.28 rg
+64 630 Td (access tokens and rotating refresh tokens stored in secure cookies.) Tj ET
+0.35 0.35 0.4 rg
+64 607 4 4 re f
+BT /F1 11 Tf 0.25 0.25 0.28 rg
+78 604 Td (Password hashing with bcrypt) Tj ET
+0.35 0.35 0.4 rg
+64 589 4 4 re f
+BT /F1 11 Tf 0.25 0.25 0.28 rg
+78 586 Td (Rate-limited sign-in) Tj ET
+0.35 0.35 0.4 rg
+64 571 4 4 re f
+BT /F1 11 Tf 0.25 0.25 0.28 rg
+78 568 Td (Re-authentication for sensitive settings) Tj ET
+0.85 0.85 0.87 RG 0.5 w
+64 52 m 548 52 l S
+BT /F1 9 Tf 0.45 0.45 0.5 rg
+64 36 Td (Sample document for preview testing) Tj ET
+BT /F1 9 Tf 0.45 0.45 0.5 rg
+488 36 Td (Page 2 of 4) Tj ET
+endstream
+endobj
+8 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 7 0 R >>
+endobj
+9 0 obj
+<< /Length 945 >>
+stream
+0.11 0.11 0.13 rg
+0 736 612 56 re f
+BT /F2 11 Tf 1 1 1 rg
+64 758 Td (Platform Security Overview) Tj ET
+BT /F2 22 Tf 0.1 0.1 0.12 rg
+64 682 Td (Tenant isolation) Tj ET
+BT /F1 11 Tf 0.25 0.25 0.28 rg
+64 646 Td (Every query is scoped to the tenant of the signed-in user. Role based access control) Tj ET
+BT /F1 11 Tf 0.25 0.25 0.28 rg
+64 630 Td (decides which actions a member can perform inside a tenant.) Tj ET
+BT /F1 11 Tf 0.25 0.25 0.28 rg
+64 604 Td (This section describes how teams work together across the organization. It explains) Tj ET
+BT /F1 11 Tf 0.25 0.25 0.28 rg
+64 588 Td (the expectations for collaboration, communication and ownership so that every) Tj ET
+BT /F1 11 Tf 0.25 0.25 0.28 rg
+64 572 Td (workspace member knows where to find help.) Tj ET
+0.85 0.85 0.87 RG 0.5 w
+64 52 m 548 52 l S
+BT /F1 9 Tf 0.45 0.45 0.5 rg
+64 36 Td (Sample document for preview testing) Tj ET
+BT /F1 9 Tf 0.45 0.45 0.5 rg
+488 36 Td (Page 3 of 4) Tj ET
+endstream
+endobj
+10 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 9 0 R >>
+endobj
+11 0 obj
+<< /Length 906 >>
+stream
+0.11 0.11 0.13 rg
+0 736 612 56 re f
+BT /F2 11 Tf 1 1 1 rg
+64 758 Td (Platform Security Overview) Tj ET
+BT /F2 22 Tf 0.1 0.1 0.12 rg
+64 682 Td (Monitoring) Tj ET
+BT /F1 11 Tf 0.25 0.25 0.28 rg
+64 646 Td (Security events are recorded in the audit trail. Administrators can review sign-ins,) Tj ET
+BT /F1 11 Tf 0.25 0.25 0.28 rg
+64 630 Td (role changes and data exports from the workspace settings.) Tj ET
+BT /F1 11 Tf 0.25 0.25 0.28 rg
+64 604 Td (Each tenant keeps its own projects, members and settings. Administrators can invite) Tj ET
+BT /F1 11 Tf 0.25 0.25 0.28 rg
+64 588 Td (people, assign roles and review the audit trail at any time from the workspace) Tj ET
+BT /F1 11 Tf 0.25 0.25 0.28 rg
+64 572 Td (settings.) Tj ET
+0.85 0.85 0.87 RG 0.5 w
+64 52 m 548 52 l S
+BT /F1 9 Tf 0.45 0.45 0.5 rg
+64 36 Td (Sample document for preview testing) Tj ET
+BT /F1 9 Tf 0.45 0.45 0.5 rg
+488 36 Td (Page 4 of 4) Tj ET
+endstream
+endobj
+12 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 11 0 R >>
+endobj
+13 0 obj
+<< /Title (Platform Security Overview) /Producer (sample generator) >>
+endobj
+xref
+0 14
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000141 00000 n 
+0000000238 00000 n 
+0000000340 00000 n 
+0000001292 00000 n 
+0000001428 00000 n 
+0000002416 00000 n 
+0000002552 00000 n 
+0000003548 00000 n 
+0000003685 00000 n 
+0000004643 00000 n 
+0000004781 00000 n 
+trailer
+<< /Size 14 /Root 1 0 R /Info 13 0 R >>
+startxref
+4868
+%%EOF
