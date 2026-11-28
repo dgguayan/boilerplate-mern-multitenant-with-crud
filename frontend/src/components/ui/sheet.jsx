@@ -31,12 +31,14 @@ function SheetPortal({
   return <SheetPrimitive.Portal data-slot="sheet-portal" {...props} />;
 }
 
-function SheetOverlay({
+// forwardRef: Radix's Presence passes a ref to the overlay, and React 18 does not pass `ref` as a prop.
+const SheetOverlay = React.forwardRef(function SheetOverlay({
   className,
   ...props
-}) {
+}, ref) {
   return (
     <SheetPrimitive.Overlay
+      ref={ref}
       data-slot="sheet-overlay"
       className={cn(
         "fixed inset-0 z-50 bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
@@ -44,7 +46,7 @@ function SheetOverlay({
       )}
       {...props} />
   );
-}
+})
 
 function SheetContent({
   className,

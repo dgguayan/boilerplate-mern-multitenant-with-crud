@@ -1,0 +1,85 @@
+/*
+ * Styles for the PDF viewer, all scoped under .pdfv so nothing leaks into the rest of the app.
+ * The text-layer rules are the subset of pdfjs-dist/web/pdf_viewer.css (v4.10) the viewer needs;
+ * the selectable text sits invisibly on top of each rendered page canvas.
+ */
+.pdfv .textLayer {
+  position: absolute;
+  text-align: initial;
+  inset: 0;
+  overflow: clip;
+  opacity: 1;
+  line-height: 1;
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+  z-index: 0;
+}
+.pdfv .textLayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}
+.pdfv .textLayer > :not(.markedContent),
+.pdfv .textLayer .markedContent span:not(.markedContent) {
+  z-index: 1;
+}
+.pdfv .textLayer span.markedContent {
+  top: 0;
+  height: 0;
+}
+.pdfv .textLayer ::selection {
+  background: rgb(0 0 255 / 0.25);
+  background: color-mix(in srgb, AccentColor, transparent 75%);
+}
+.pdfv .textLayer br::selection {
+  background: transparent;
+}
+.pdfv .textLayer .endOfContent {
+  display: block;
+  position: absolute;
+  inset: 100% 0 0;
+  z-index: 0;
+  cursor: default;
+  user-select: none;
+}
+
+/* Search hits */
+.pdfv .textLayer .pdfv-hit {
+  margin: -1px;
+  padding: 1px;
+  border-radius: 3px;
+  background-color: rgb(250 204 21 / 0.4);
+}
+.pdfv .textLayer .pdfv-hit-active {
+  background-color: rgb(249 115 22 / 0.5);
+  outline: 2px solid rgb(234 88 12 / 0.9);
+}
+
+/* Pages keep their paper colour in dark mode — PDFs are designed for white backgrounds. */
+.pdfv .pdfv-page {
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08), 0 4px 16px rgb(0 0 0 / 0.08);
+}
+.pdfv .pdfv-page canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Two-finger pinch is handled by the viewer; single-finger panning stays native. */
+.pdfv .pdfv-scroll {
+  touch-action: pan-x pan-y;
+  overscroll-behavior: contain;
+}
+
+@media print {
+  .pdfv {
+    display: none !important;
+  }
+}

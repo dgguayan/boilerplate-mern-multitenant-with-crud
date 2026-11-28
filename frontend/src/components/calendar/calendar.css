@@ -1,0 +1,79 @@
+/* FullCalendar themed with the app's tokens; scoped to .cal-fc so nothing else is affected. */
+.cal-fc {
+  --fc-border-color: var(--border);
+  --fc-page-bg-color: var(--background);
+  --fc-neutral-bg-color: color-mix(in oklch, var(--muted) 60%, transparent);
+  --fc-neutral-text-color: var(--muted-foreground);
+  --fc-today-bg-color: color-mix(in oklch, var(--primary) 5%, transparent);
+  --fc-now-indicator-color: var(--destructive);
+  --fc-highlight-color: color-mix(in oklch, var(--primary) 12%, transparent);
+  --fc-non-business-color: color-mix(in oklch, var(--muted) 45%, transparent);
+  --fc-list-event-hover-bg-color: var(--muted);
+  --fc-more-link-bg-color: transparent;
+  --fc-more-link-text-color: var(--foreground);
+  --fc-small-font-size: 0.75rem;
+  --fc-event-selected-overlay-color: color-mix(in oklch, var(--foreground) 10%, transparent);
+  font-size: 0.8125rem;
+}
+
+.cal-fc .fc { height: 100%; }
+.cal-fc .fc-theme-standard .fc-scrollgrid { border-radius: 0.75rem; overflow: hidden; }
+.cal-fc .fc-col-header-cell { padding: 0.375rem 0; font-weight: 500; color: var(--muted-foreground); }
+.cal-fc .fc-col-header-cell-cushion,
+.cal-fc .fc-daygrid-day-number { color: inherit; text-decoration: none; }
+.cal-fc a.fc-col-header-cell-cushion:hover,
+.cal-fc a.fc-daygrid-day-number:hover { text-decoration: underline; }
+
+/* Today: a filled circle around the date number (plus the tinted cell) */
+.cal-fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 1.6rem; height: 1.6rem; margin: 0.15rem; border-radius: 999px;
+  background: var(--primary); color: var(--primary-foreground); font-weight: 600;
+}
+.cal-fc .fc-day-other .fc-daygrid-day-top { opacity: 0.45; }
+
+/* Events */
+.cal-fc .fc-event {
+  border-width: 0 0 0 3px;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+}
+.cal-fc .fc-event:hover { box-shadow: 0 2px 8px rgb(0 0 0 / 0.12); }
+.cal-fc .fc-event:focus-visible { outline: 3px solid color-mix(in oklch, var(--ring) 60%, transparent); outline-offset: 1px; }
+.cal-fc .fc-h-event .fc-event-main,
+.cal-fc .fc-v-event .fc-event-main { color: var(--foreground); }
+.cal-fc .fc-daygrid-event { margin-top: 2px; }
+.cal-fc .fc-timegrid-event { box-shadow: 0 0 0 1px var(--background); }
+
+.cal-fc .cal-past { opacity: 0.55; }
+.cal-fc .cal-past:hover { opacity: 0.9; }
+.cal-fc .cal-ongoing { box-shadow: 0 0 0 2px color-mix(in oklch, var(--primary) 55%, transparent); }
+.cal-fc .cal-status-cancelled .cal-title { text-decoration: line-through; }
+.cal-fc .cal-status-draft { border-style: dashed !important; border-width: 1px 1px 1px 3px !important; }
+.cal-fc .cal-status-postponed .cal-title { font-style: italic; }
+
+.cal-fc .fc-daygrid-more-link { font-size: 0.72rem; font-weight: 500; padding: 0 0.25rem; }
+.cal-fc .fc-popover { background: var(--popover); color: var(--popover-foreground); border-radius: 0.75rem; overflow: hidden; box-shadow: 0 8px 24px rgb(0 0 0 / 0.16); z-index: 30; }
+.cal-fc .fc-popover-header { background: var(--muted); padding: 0.4rem 0.6rem; }
+
+/* Time grid */
+.cal-fc .fc-timegrid-slot { height: 2.25rem; }
+.cal-fc .fc-timegrid-slot-label { color: var(--muted-foreground); font-size: 0.72rem; }
+.cal-fc .fc-timegrid-axis-cushion { color: var(--muted-foreground); font-size: 0.72rem; }
+
+/* List (agenda) */
+.cal-fc .fc-list { border-radius: 0.75rem; overflow: hidden; }
+.cal-fc .fc-list-day-cushion { background: color-mix(in oklch, var(--muted) 70%, transparent); }
+.cal-fc .fc-list-day-text, .cal-fc .fc-list-day-side-text { color: var(--foreground); text-decoration: none; font-weight: 600; }
+.cal-fc .fc-list-event td { border-color: var(--border); }
+.cal-fc .fc-list-event-dot { border-color: var(--fc-event-border-color, currentColor); }
+.cal-fc .fc-list-empty { background: transparent; color: var(--muted-foreground); }
+
+/* Multi-month */
+.cal-fc .fc-multimonth { border-radius: 0.75rem; }
+.cal-fc .fc-multimonth-title { font-size: 0.95rem; font-weight: 600; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cal-fc .fc-event { transition: none; }
+}

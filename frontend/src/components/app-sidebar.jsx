@@ -37,10 +37,11 @@ const mainGroups = [
   },
   {
     label: "Administration",
+    adminOnly: true, // these pages and their API are restricted to administrators
     items: [
-      { title: "Members", url: "/members", icon: Users },
-      { title: "Access Control", url: "/access-control", icon: ShieldCheck },
-      { title: "Audit Trail", url: "/audit-trail", icon: Activity },
+      { title: "User Management", url: "/members", icon: Users },
+      { title: "Roles and Permissions", url: "/access-control", icon: ShieldCheck },
+      { title: "Logs", url: "/audit-trail", icon: Activity },
     ],
   },
 ]
@@ -179,7 +180,7 @@ function NavUser({ user, onLogout }) {
 export function AppSidebar(props) {
   const { pathname } = useLocation()
   const navigate = useNavigate()
-  const { user, logout } = useAuth()
+  const { user, logout, hasRole } = useAuth()
 
   const handleLogout = async () => {
     await logout()
@@ -201,7 +202,7 @@ export function AppSidebar(props) {
       </SidebarHeader>
 
       <SidebarContent>
-        <NavMain groups={mainGroups} pathname={pathname} />
+        <NavMain groups={hasRole("admin") ? mainGroups : mainGroups.filter((g) => !g.adminOnly)} pathname={pathname} />
       </SidebarContent>
 
       <SidebarFooter>
