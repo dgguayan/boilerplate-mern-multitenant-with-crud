@@ -22,13 +22,13 @@ export const canEditEvent = (user, event) =>
   isAdmin(user) ||
   (rank(user.role) >= RANK.manager && String(event.createdBy?._id ?? event.createdBy) === String(user.userId));
 
-const httpError = (status, message) => Object.assign(new Error(message), { status });
+export const httpError = (status, message) => Object.assign(new Error(message), { status });
 
 export const MAX_RANGE_DAYS = 400;
 const MAX_OCCURRENCES = 5000;
 
 /** Events the user may see: admins see everything; others see non-draft public/restricted events and their own. */
-async function accessFilter(user) {
+export async function accessFilter(user) {
   const base = { tenantId: user.tenantId, deleted: false };
   if (isAdmin(user)) return base;
   const privateCategories = await CalendarCategory.find({
@@ -130,7 +130,7 @@ async function findEditable(user, id) {
 }
 
 /** Start and end of one occurrence of a series. */
-function occurrenceAt(series, key) {
+export function occurrenceAt(series, key) {
   const day = DateTime.fromISO(key, { zone: 'utc' });
   if (!day.isValid) throw httpError(422, 'Invalid occurrence date.');
   const found = expandOccurrences(

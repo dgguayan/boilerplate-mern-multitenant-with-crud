@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import { DateTime } from "luxon"
-import { CalendarPlus, MapPin, Repeat, SearchX, Ticket, Users, Video } from "lucide-react"
+import { CalendarPlus, Check, CircleHelp, Hourglass, MapPin, Repeat, SearchX, Ticket, Users, Video } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
@@ -14,6 +14,13 @@ import { SORTS, attendanceMode, registrationOpen, sortOccurrences } from "../lib
 const PAGE = 30
 
 /** One event as a compact card. Reused by the list, upcoming and agenda-style widgets. */
+// The viewer's own reply, shown on the row ("Can't go" is left off: the row stays quiet).
+const MY_REPLY = {
+  going: { label: "You're going", icon: Check },
+  waitlist: { label: "On the waitlist", icon: Hourglass },
+  maybe: { label: "Maybe", icon: CircleHelp },
+}
+
 export function EventRow({ occurrence: o, showDate = true, compact = false }) {
   const { categoriesById, prefs, openDetails } = useCalendar()
   const category = categoriesById.get(o.categoryId)
@@ -22,6 +29,7 @@ export function EventRow({ occurrence: o, showDate = true, compact = false }) {
   const start = o.allDay ? fromJS(o.start, "utc") : fromJS(o.start, prefs.timeZone)
   const mode = attendanceMode(o)
   const price = o.price?.amount > 0 ? new Intl.NumberFormat(undefined, { style: "currency", currency: o.price.currency || "USD" }).format(o.price.amount) : null
+  const reply = MY_REPLY[o.myRsvp]
 
   return (
     <li>
@@ -52,6 +60,12 @@ export function EventRow({ occurrence: o, showDate = true, compact = false }) {
               </Badge>
             )}
             <StatusBadge status={o.status} />
+            {reply && (
+              <Badge variant={o.myRsvp === "going" ? "default" : "secondary"} className="gap-1">
+                <reply.icon className="size-3" aria-hidden="true" />
+                {reply.label}
+              </Badge>
+            )}
             {o.isRecurring && <Repeat className="size-3.5 text-muted-foreground" aria-label="Recurring" />}
           </div>
           <p className="text-xs text-muted-foreground">
@@ -88,7 +102,7 @@ export function EventRow({ occurrence: o, showDate = true, compact = false }) {
             {o.capacity != null && (
               <span className="inline-flex items-center gap-1">
                 <Users className="size-3.5" aria-hidden="true" />
-                {o.capacity} places
+                {o.capacity} {o.capacity === 1 ? "place" : "places"}
               </span>
             )}
             {o.registrationDeadline && state === "upcoming" && (

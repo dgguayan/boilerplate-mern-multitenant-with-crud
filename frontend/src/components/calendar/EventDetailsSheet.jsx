@@ -39,6 +39,7 @@ import { formatEventTime, fromJS, timeState } from "./lib/dates"
 import { describeRule } from "./lib/recurrence"
 import { registrationOpen } from "./lib/filters"
 import { googleCalendarUrl, outlookUrl } from "./lib/add-to-calendar"
+import { RsvpPanel } from "./RsvpPanel"
 
 const VISIBILITY = {
   public: { label: "Public", icon: Globe },
@@ -81,7 +82,7 @@ const ext = { target: "_blank", rel: "noopener noreferrer" }
 
 export function EventDetailsSheet() {
   const ctx = useCalendar()
-  const { details: occ, closeDetails, categoriesById, resourcesById, prefs, permissions, openEdit, deleteOccurrence, duplicateOccurrence } = ctx
+  const { details: occ, closeDetails, categoriesById, resourcesById, prefs, permissions, openEdit, deleteOccurrence, duplicateOccurrence, reload } = ctx
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const occId = occ?.id
@@ -219,6 +220,9 @@ export function EventDetailsSheet() {
               )}
             </div>
 
+            {/* Replies; the calendar reloads so the "Going" marker and the My replies filter follow. */}
+            <RsvpPanel key={occ.id} occ={occ} onChanged={reload} />
+
             {error && <p role="alert" className="px-4 py-3 text-sm text-destructive">{error}</p>}
             {!event && !error && (
               <div className="space-y-3 p-4" aria-busy="true" aria-label="Loading event details">
@@ -264,7 +268,7 @@ export function EventDetailsSheet() {
                   )}
                   {(event.capacity != null || event.registrationDeadline) && (
                     <Row icon={Users} label="Registration">
-                      {event.capacity != null && <p>Capacity: {event.capacity} people</p>}
+                      {event.capacity != null && <p>Capacity: {event.capacity} {event.capacity === 1 ? "person" : "people"}</p>}
                       {event.registrationDeadline && (
                         <p className="text-muted-foreground">
                           {registrationOpen({ ...occ, registrationDeadline: event.registrationDeadline }) ? "Registration open until " : "Registration closed · deadline was "}

@@ -109,6 +109,7 @@ export function CalendarSidebar({ date, onSelectDate, occurrences, filters, setF
           { id: "f-mode", key: "mode", label: "Attendance", options: [["any", "Online or in person"], ["online", "Online"], ["in-person", "In person"], ["hybrid", "Hybrid"]] },
           { id: "f-price", key: "price", label: "Price", options: [["any", "Free or paid"], ["free", "Free"], ["paid", "Paid"]] },
           { id: "f-avail", key: "availability", label: "Registration", options: [["any", "Any"], ["open", "Open"], ["closed", "Closed"]] },
+          { id: "f-rsvp", key: "rsvp", label: "My replies", options: [["any", "Any"], ["going", "I'm going"], ["replied", "I replied"], ["unanswered", "Not replied"]] },
         ].map((select) => (
           <div key={select.key}>
             <label htmlFor={select.id} className="mb-0.5 block text-xs text-muted-foreground">

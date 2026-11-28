@@ -149,3 +149,9 @@ export function validateImportedEvent(draft) {
   const { value, error } = createEventSchema.validate(draft, { abortEarly: true, stripUnknown: true });
   return { value, error: error?.details[0]?.message.replace(/"/g, "'") };
 }
+
+export const rsvpSchema = Joi.object({
+  status: Joi.string().valid('going', 'maybe', 'declined').required(),
+  occurrence: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).allow(null),
+  note: Joi.string().trim().max(300).allow(''),
+});

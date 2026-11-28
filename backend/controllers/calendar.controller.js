@@ -1,4 +1,5 @@
 import * as calendar from '../services/calendar.service.js';
+import * as rsvp from '../services/rsvp.service.js';
 import * as apiResponse from '../utils/apiResponse.js';
 import { audit } from '../utils/audit.js';
 import {
@@ -45,6 +46,9 @@ async function conflictsFor(user, event) {
 export const occurrences = handle(async (req, res) => {
   const { start, end } = validQuery(rangeQuerySchema, req.query);
   const result = await calendar.getOccurrences({ user: req.user, start, end });
+  // The viewer's own answer on each occurrence, for the "Going" marker and the "My RSVPs" filter.
+  const answers = await rsvp.myAnswers(req.user, result.occurrences);
+  for (const occ of result.occurrences) occ.myRsvp = answers.get(rsvp.answerKey(occ)) ?? null;
   return apiResponse.success(res, result);
 });
 
@@ -179,4 +183,33 @@ export const deleteResource = handle(async (req, res) => {
   await calendar.deleteResource({ user: req.user, id: req.params.id });
   logCalendar(req, 'resource_deleted', 'Deleted a resource', { type: 'resource', id: req.params.id });
   return apiResponse.success(res, {}, 'Resource deleted');
+});
+
+/* ── RSVP ─────────────────────────────────────────────── */
+
+const occurrenceParam = (value) => (/^\d{4}-\d{2}-\d{2}$/.test(value || '') ? value : undefined);
+const RSVP_WORDS = { going: 'is going to', maybe: 'might go to', declined: "can't go to", waitlist: 'joined the waitlist for' };
+
+export const getRsvp = handle(async (req, res) => {
+  const summary = await rsvp.getRsvpSummary({ user: req.user, id: req.params.id, occurrenceKey: occurrenceParam(req.query.occurrence) });
+  return apiResponse.success(res, summary);
+});
+
+export const setRsvp = handle(async (req, res) => {
+  const { status, note, occurrence } = req.body;
+  const result = await rsvp.setRsvp({ user: req.user, id: req.params.id, occurrenceKey: occurrence, status, note });
+  const stored = result.summary.mine?.status;
+  logCalendar(req, 'rsvp', `Replied: ${RSVP_WORDS[stored] || stored} “${result.target.event.title}”`, eventTarget(result.target.event), {
+    status: stored,
+    occurrence: result.target.key,
+    previous: result.previous,
+    promoted: result.promoted.length || undefined,
+  });
+  req.app.emit('calendar:rsvp', { user: req.user, ...result });
+  return apiResponse.success(res, result.summary, stored === 'waitlist' ? 'The event is full — you are on the waitlist' : 'Reply saved');
+});
+
+export const listAttendees = handle(async (req, res) => {
+  const result = await rsvp.listAttendees({ user: req.user, id: req.params.id, occurrenceKey: occurrenceParam(req.query.occurrence) });
+  return apiResponse.success(res, result);
 });

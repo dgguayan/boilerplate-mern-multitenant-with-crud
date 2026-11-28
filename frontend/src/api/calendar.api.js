@@ -15,6 +15,11 @@ export const duplicateEvent = (id) => api.post(`${base}/events/${id}/duplicate`)
 export const revertChanges = (changes) => api.post(`${base}/revert`, { changes });
 export const checkConflicts = (payload, signal) => api.post(`${base}/conflicts`, payload, { signal });
 
+// Replies. `occurrence` (yyyy-mm-dd) picks one occurrence of a recurring event.
+export const getRsvp = (id, occurrence) => api.get(`${base}/events/${id}/rsvp`, { params: { occurrence } });
+export const setRsvp = (id, { status, occurrence, note }) => api.put(`${base}/events/${id}/rsvp`, { status, occurrence, note });
+export const getAttendees = (id, occurrence) => api.get(`${base}/events/${id}/attendees`, { params: { occurrence } });
+
 export const getCategories = () => api.get(`${base}/categories`);
 export const saveCategory = (id, data) => (id ? api.put(`${base}/categories/${id}`, data) : api.post(`${base}/categories`, data));
 export const deleteCategory = (id) => api.delete(`${base}/categories/${id}`);

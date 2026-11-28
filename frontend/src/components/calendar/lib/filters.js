@@ -27,9 +27,20 @@ export const EMPTY_FILTERS = {
   price: "any", // any | free | paid
   mode: "any", // any | online | in-person | hybrid
   availability: "any", // any | open | closed
+  rsvp: "any", // any | going (incl. waitlist) | replied | unanswered
   time: "any", // any | upcoming | ongoing | past
   tags: [],
   resourceIds: [],
+}
+
+export const RSVP_FILTER_LABELS = { going: "I'm going", replied: "I replied", unanswered: "Not replied" }
+
+/** The viewer's reply against the "My replies" filter. The waitlist counts as going. */
+export function matchesRsvp(myRsvp, filter) {
+  if (filter === "going") return myRsvp === "going" || myRsvp === "waitlist"
+  if (filter === "replied") return Boolean(myRsvp)
+  if (filter === "unanswered") return !myRsvp
+  return true
 }
 
 export const attendanceMode = (o) => {
@@ -100,6 +111,7 @@ export function applyFilters(occurrences, filters, categoriesById, now = new Dat
     if (filters.mode !== "any" && attendanceMode(o) !== filters.mode) continue
     if (filters.availability === "open" && !registrationOpen(o, now)) continue
     if (filters.availability === "closed" && registrationOpen(o, now)) continue
+    if (filters.rsvp && filters.rsvp !== "any" && !matchesRsvp(o.myRsvp, filters.rsvp)) continue
     if (filters.time !== "any" && timeState(o, now) !== filters.time) continue
     if (tags.size && !o.tags?.some((t) => tags.has(t))) continue
     if (resources.size && !o.resourceIds?.some((r) => resources.has(r))) continue
@@ -156,6 +168,7 @@ export function activeFilterChips(filters, { categoriesById, resourcesById }) {
   if (filters.price !== "any") chips.push({ key: "price", label: filters.price === "free" ? "Free" : "Paid", remove: set({ price: "any" }) })
   if (filters.mode !== "any") chips.push({ key: "mode", label: { online: "Online", "in-person": "In person", hybrid: "Hybrid" }[filters.mode], remove: set({ mode: "any" }) })
   if (filters.availability !== "any") chips.push({ key: "avail", label: filters.availability === "open" ? "Registration open" : "Registration closed", remove: set({ availability: "any" }) })
+  if (filters.rsvp && filters.rsvp !== "any") chips.push({ key: "rsvp", label: RSVP_FILTER_LABELS[filters.rsvp], remove: set({ rsvp: "any" }) })
   if (filters.time !== "any") chips.push({ key: "time", label: { upcoming: "Upcoming", ongoing: "Happening now", past: "Past" }[filters.time], remove: set({ time: "any" }) })
   for (const tag of filters.tags) chips.push({ key: `tag-${tag}`, label: `#${tag}`, remove: (f) => ({ ...f, tags: f.tags.filter((t) => t !== tag) }) })
   for (const id of filters.resourceIds) {

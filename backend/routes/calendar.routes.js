@@ -12,6 +12,7 @@ import {
   createEventSchema,
   resourceSchema,
   revertSchema,
+  rsvpSchema,
   updateEventSchema,
 } from '../validators/calendar.validators.js';
 
@@ -45,6 +46,10 @@ router.delete('/events/:id', requireRole(...EDITORS), controller.deleteEvent);
 router.post('/events/:id/duplicate', requireRole(...EDITORS), controller.duplicateEvent);
 router.post('/revert', requireRole(...EDITORS), validate(revertSchema), controller.revert);
 router.post('/conflicts', validate(conflictsSchema), controller.conflicts);
+
+router.get('/events/:id/rsvp', controller.getRsvp);
+router.put('/events/:id/rsvp', validate(rsvpSchema), controller.setRsvp);
+router.get('/events/:id/attendees', controller.listAttendees);
 
 router.get('/export', controller.exportCalendar);
 router.post(
